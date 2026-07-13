@@ -167,6 +167,62 @@ public class ConfigStoreTest {
     }
 
     @Test
+    public void statusCarriesEffectiveRendererSelections() throws Exception {
+        File dir = tmp.getRoot();
+        write(dir, ConfigStore.CONFIG_FILE,
+                "{\"digitalColor\":\"silver\",\"showDate\":false,"
+                        + "\"digitalSizePercent\":75,\"burnInEnabled\":false,"
+                        + "\"burnInMaxShiftPx\":4}");
+        ConfigStore s = store(dir);
+        s.reload();
+
+        Object parsed = Json.parse(s.renderStatus(false));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> map = (Map<String, Object>) parsed;
+        @SuppressWarnings("unchecked")
+        Map<String, Object> eff = (Map<String, Object>) map.get("effectiveConfig");
+
+        // Approved names and bounded numbers only — never resolved colour values.
+        assertEquals("silver", eff.get("digitalColor"));
+        assertEquals("grey", eff.get("dateColor"));
+        assertEquals("silver", eff.get("tickColor"));
+        assertEquals("orange", eff.get("accentColor"));
+        assertEquals(Boolean.FALSE, eff.get("showDate"));
+        assertEquals(75L, eff.get("digitalSizePercent"));
+        assertEquals(100L, eff.get("secondarySizePercent"));
+        assertEquals(Boolean.FALSE, eff.get("burnInEnabled"));
+        assertEquals(4L, eff.get("burnInMaxShiftPx"));
+    }
+
+    @Test
+    public void statusEffectiveConfigExposesOnlySchemaKeys() throws Exception {
+        ConfigStore s = store(tmp.getRoot());
+        s.reload();
+        Object parsed = Json.parse(s.renderStatus(false));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> map = (Map<String, Object>) parsed;
+        @SuppressWarnings("unchecked")
+        Map<String, Object> eff = (Map<String, Object>) map.get("effectiveConfig");
+        // Everything the status publishes back must itself be a key the strict
+        // schema accepts — nothing extra, nothing secret.
+        for (String key : eff.keySet()) {
+            ExternalConfig.parse("{\"" + key + "\":"
+                    + jsonLiteral(eff.get(key)) + "}");
+        }
+    }
+
+    private static String jsonLiteral(Object v) {
+        if (v == null) {
+            // The only nullable schema key is timeZone; round-trip a valid id.
+            return "\"UTC\"";
+        }
+        if (v instanceof String) {
+            return "\"" + v + "\"";
+        }
+        return String.valueOf(v);
+    }
+
+    @Test
     public void statusRecordsRejectReasonButNotRawInput() throws Exception {
         File dir = tmp.getRoot();
         write(dir, ConfigStore.CONFIG_FILE, "{\"timeZone\":\"Mars/Olympus\"}");

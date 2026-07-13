@@ -4,8 +4,9 @@
 # external configuration core.
 #
 # The configuration core (Json, ExternalConfig, ConfigException, ConfigStore)
-# deliberately has NO Android dependency, so its strict-ingestion,
-# last-known-good, reload, atomic-replacement, and status behaviours can be
+# and the renderer config model/mapping (ClockConfig) deliberately have NO
+# Android dependency, so strict-ingestion, last-known-good, reload,
+# atomic-replacement, status, and name-to-colour mapping behaviours can be
 # compiled and exercised under a plain JVM with JUnit — no Android SDK, no
 # device, and without touching the licence-gated Gradle Android build.
 #
@@ -32,15 +33,18 @@ SOURCES=(
     "$SRC/Json.java"
     "$SRC/ExternalConfig.java"
     "$SRC/ConfigStore.java"
+    "$SRC/ClockConfig.java"
     "$SRC/BurnInOffset.java"
     "$TST/ExternalConfigTest.java"
     "$TST/ConfigStoreTest.java"
+    "$TST/ClockConfigTest.java"
     "$TST/BurnInOffsetTest.java"
 )
 
 TESTS=(
     com.befeast.tx10clock.ExternalConfigTest
     com.befeast.tx10clock.ConfigStoreTest
+    com.befeast.tx10clock.ClockConfigTest
     com.befeast.tx10clock.BurnInOffsetTest
 )
 
