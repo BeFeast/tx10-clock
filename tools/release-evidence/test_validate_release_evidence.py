@@ -172,6 +172,9 @@ class PinnedToolchainMatchesBuildFiles(unittest.TestCase):
             signer = fh.read()
         self.assertIn("-storepass:env RELEASE_KEYSTORE_PASSWORD", signer)
         self.assertNotIn("-storepass \"$RELEASE_KEYSTORE_PASSWORD\"", signer)
+        with open(os.path.join(ROOT, "scripts", "release-resolve-signing.sh"), "r", encoding="utf-8") as fh:
+            resolver = fh.read()
+        self.assertIn('--env="$INFISICAL_ENVIRONMENT"', resolver)
 
     def test_release_inspector_treats_evidence_identity_as_fixed_strings(self):
         path = os.path.join(ROOT, "scripts", "inspect-release-apk.sh")
