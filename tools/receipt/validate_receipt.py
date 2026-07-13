@@ -265,7 +265,7 @@ HYGIENE_RULES = (
     (
         "local_absolute_path",
         re.compile(
-            r"(?:/(?:home|Users|root|srv|opt|etc|var|tmp|mnt|media|private)/"
+            r"(?:(?:^|[\s(\"'=\[])/(?!/)[^\s\"'<>]*"
             r"|[A-Za-z]:\\|~/)"
         ),
     ),
@@ -289,6 +289,8 @@ HYGIENE_RULES = (
             r"|\bAKIA[0-9A-Z]{8,}"
             r"|\bAIza[0-9A-Za-z_-]{10,}"
             r"|\bssh-(?:rsa|ed25519)\s+AAAA"
+            r"|\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{8,}"
+            r"\.[A-Za-z0-9_-]{8,}\b"
             r"|(?i:\bbearer\s+[a-z0-9._~+/=-]{8,})"
             r"|(?i:\b(?:api[_-]?key|access[_-]?key|secret|password|passwd"
             r"|token|credential)s?\s*[:=]))"
@@ -469,9 +471,18 @@ def _check_semantics(doc, errors):
         and verification["verified_at"] is not None
     ):
         delivered_at = next(
-            step["at"] for step in history if step["state"] == "delivered"
+            (step["at"] for step in history if step["state"] == "delivered"),
+            None,
         )
-        if _parse_utc(verification["verified_at"]) < _parse_utc(delivered_at):
+        if delivered_at is None:
+            errors.append(
+                _error(
+                    "state_invalid",
+                    "$.delivery.history",
+                    "verified delivery requires a delivered history entry",
+                )
+            )
+        elif _parse_utc(verification["verified_at"]) < _parse_utc(delivered_at):
             errors.append(
                 _error(
                     "state_invalid",
