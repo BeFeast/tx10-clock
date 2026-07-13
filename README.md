@@ -29,6 +29,26 @@ a frame size, and a timestamp from an injectable
 [`TimeSource`](app/src/main/java/com/befeast/tx10clock/TimeSource.java). That
 purity is what makes the golden test deterministic.
 
+## Configuration & runtime status
+
+The app is driven by a small, **renderer-agnostic** external configuration file
+(`getExternalFilesDir()/config.json`, no storage permission) and publishes a
+verifier-safe `status.json`. Ingestion is strict and bounded (oversized,
+malformed, duplicate-key, unknown-key, and out-of-range documents are rejected)
+with a last-known-good copy that keeps a running clock alive across a bad edit.
+The full contract — accepted schema, the same-directory temp-file + atomic-rename
+update protocol, `status.json` shape, and boot behaviour — is documented in
+[`docs/external-config.md`](docs/external-config.md).
+
+The configuration core
+([`ExternalConfig`](app/src/main/java/com/befeast/tx10clock/ExternalConfig.java),
+[`Json`](app/src/main/java/com/befeast/tx10clock/Json.java),
+[`ConfigStore`](app/src/main/java/com/befeast/tx10clock/ConfigStore.java)) has
+**no Android dependency**, so its strict-ingestion, last-known-good, reload,
+atomic-replacement, and status behaviours run deterministically under a plain
+JVM — see the offline test path below. The settings it carries are behavioural
+only and encode no visual decisions.
+
 ## Requirements
 
 - JDK 17
@@ -40,7 +60,15 @@ purity is what makes the golden test deterministic.
 
 ```bash
 ./gradlew assembleRelease        # build the release APK
-./gradlew lint test              # Android Lint + unit/static/golden checks
+./gradlew lint test              # Android Lint + unit/static/golden/config checks
+```
+
+The strict-ingestion, last-known-good, reload, atomic-replacement, and
+`status.json` checks for the Android-free configuration core can also be run
+**offline, without the Android SDK**, with a plain JDK 17 + JUnit:
+
+```bash
+scripts/run-config-jvm-tests.sh   # compiles + runs the config-core tests only
 ```
 
 The scaffold's `assembleRelease` output is unsigned. CI may retain it under the

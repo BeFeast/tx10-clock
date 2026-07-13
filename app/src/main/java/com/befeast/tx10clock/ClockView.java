@@ -10,8 +10,8 @@ import java.time.ZonedDateTime;
 /** Full-frame clock surface with display-synchronised smooth animation. */
 public final class ClockView extends View {
 
-    private final ClockRenderer renderer;
-    private final TimeSource timeSource;
+    private ClockRenderer renderer;
+    private TimeSource timeSource;
     private boolean running;
 
     public ClockView(Context context) {
@@ -22,6 +22,13 @@ public final class ClockView extends View {
         super(context, attrs);
         renderer = new ClockRenderer(ClockConfig.defaultConfig());
         timeSource = TimeSource.system();
+    }
+
+    /** Atomically apply a newly accepted behavioral config on the UI thread. */
+    public void apply(ClockConfig config, TimeSource source) {
+        renderer = new ClockRenderer(config);
+        timeSource = source;
+        postInvalidateOnAnimation();
     }
 
     public void start() {
