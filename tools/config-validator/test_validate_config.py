@@ -632,6 +632,8 @@ class SchemaFileTests(unittest.TestCase):
             schema = json.load(fh)
         props = schema["properties"]
 
+        self.assertEqual(props["schemaVersion"]["const"], "1.0.0")
+
         locale = props["locale"]["allOf"][0]
         self.assertEqual(locale["if"]["properties"]["policy"]["const"], "fixed")
         self.assertEqual(locale["then"]["properties"]["tag"]["type"], "string")

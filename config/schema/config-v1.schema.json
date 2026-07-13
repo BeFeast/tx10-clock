@@ -171,6 +171,7 @@
       "type": "object"
     },
     "schemaVersion": {
+      "const": "1.0.0",
       "description": "Config contract version this document claims to follow.",
       "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
       "type": "string"
