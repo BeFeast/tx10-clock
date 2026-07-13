@@ -88,6 +88,9 @@ jobs:
           # License acceptance is a human gate, not a CI side effect. The
           # operator-gated runner image must already provide accepted licenses.
           accept-android-sdk-licenses: false
+          # setup-android defaults this to "tools platform-tools" and supplies
+          # affirmative input to sdkmanager. Empty disables that hidden install.
+          packages: ''
           # Pinned release inputs (release/toolchain.lock.json): compile against
           # platform 29 with Build Tools 36.0.0 (AGP 9.2.1 requires 36.0.0).
           cmdline-tools-version: ${{ env.ANDROID_CMDLINE_TOOLS_BUILD }}

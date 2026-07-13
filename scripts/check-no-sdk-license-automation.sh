@@ -21,7 +21,6 @@ forbidden=(
     'accept-android-sdk-licenses:[[:space:]]*true'
     'accept-android-sdk-licenses[[:space:]]*=[[:space:]]*true'
     '--accept-licenses'
-    '^[[:space:]]+packages:'             # setup-android feeds "y" to every package install
 )
 
 fail=0
@@ -37,13 +36,37 @@ for pat in "${forbidden[@]}"; do
     fi
 done
 
-# Positively assert the CI SDK action keeps licence acceptance disabled.
-CI=".github/workflows/ci.yml"
-if [ -f "$CI" ]; then
-    if ! grep -Eq 'accept-android-sdk-licenses:[[:space:]]*false' "$CI"; then
-        echo "check-no-sdk-license-automation: FAIL — CI must set accept-android-sdk-licenses: false" >&2
-        fail=1
-    fi
+# Positively assert every setup-android use disables both explicit licence
+# acceptance and the action's default package install. setup-android supplies
+# affirmative input to sdkmanager for every package in its `packages` input;
+# omitting this input is therefore unsafe because its default is non-empty.
+workflow_files="$(git ls-files '.github/workflows/*.yml' '.github/workflows/*.yaml')"
+setup_count="$(printf '%s\n' "$workflow_files" | xargs -r grep -hEc \
+    'uses:[[:space:]]*android-actions/setup-android@' | awk '{s += $1} END {print s + 0}')"
+accept_false_count="$(printf '%s\n' "$workflow_files" | xargs -r grep -hEc \
+    '^[[:space:]]+accept-android-sdk-licenses:[[:space:]]*false[[:space:]]*$' | awk '{s += $1} END {print s + 0}')"
+empty_packages_count="$(printf '%s\n' "$workflow_files" | xargs -r grep -hEc \
+    "^[[:space:]]+packages:[[:space:]]*(''|\"\")[[:space:]]*$" | awk '{s += $1} END {print s + 0}')"
+
+if [ "$setup_count" -eq 0 ]; then
+    echo "check-no-sdk-license-automation: FAIL — no setup-android action found" >&2
+    fail=1
+elif [ "$accept_false_count" -ne "$setup_count" ]; then
+    echo "check-no-sdk-license-automation: FAIL — every setup-android use must set accept-android-sdk-licenses: false" >&2
+    fail=1
+fi
+
+if [ "$empty_packages_count" -ne "$setup_count" ]; then
+    echo "check-no-sdk-license-automation: FAIL — every setup-android use must set packages: '' to disable its unsafe default" >&2
+    fail=1
+fi
+
+nonempty_packages="$(printf '%s\n' "$workflow_files" | xargs -r grep -En \
+    '^[[:space:]]+packages:' | grep -Ev ":.*packages:[[:space:]]*(''|\"\")[[:space:]]*$" || true)"
+if [ -n "$nonempty_packages" ]; then
+    echo "check-no-sdk-license-automation: FAIL — setup-android package input must be empty:" >&2
+    printf '%s\n' "$nonempty_packages" >&2
+    fail=1
 fi
 
 if [ "$fail" -ne 0 ]; then
