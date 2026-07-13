@@ -45,8 +45,12 @@ put() {
 fetch_infisical() {
     command -v infisical >/dev/null 2>&1 || die "infisical CLI not found on runner"
     : "${INFISICAL_UNIVERSAL_AUTH_CLIENT_ID:?}" \
-      "${INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET:?}" "${INFISICAL_PROJECT:?}"
+      "${INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET:?}" "${INFISICAL_PROJECT:?}" \
+      "${INFISICAL_API_URL:?}"
     : "${INFISICAL_ENVIRONMENT:=prod}"
+    # The CLI consumes INFISICAL_DOMAIN, while the repository-level variable
+    # is deliberately named INFISICAL_API_URL. Never fall back to public cloud.
+    export INFISICAL_DOMAIN="${INFISICAL_API_URL%/}"
     local token
     # Infisical reads Universal Auth credentials from env, so the client
     # secret never appears in process arguments or logs.

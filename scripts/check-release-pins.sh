@@ -126,6 +126,8 @@ if grep -Eq -- '--(client-secret|storepass|token)=' scripts/release-*.sh; then
 fi
 grep -Fq 'INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET' scripts/release-resolve-signing.sh \
     || die "Infisical Universal Auth secret is not sourced from environment"
+grep -Fq 'export INFISICAL_DOMAIN="${INFISICAL_API_URL%/}"' scripts/release-resolve-signing.sh \
+    || die "Infisical CLI domain is not bound to the configured API URL"
 grep -Fq -- '--env="$INFISICAL_ENVIRONMENT"' scripts/release-resolve-signing.sh \
     && grep -Fq 'INFISICAL_ENVIRONMENT: ${{ vars.INFISICAL_ENVIRONMENT }}' "$REL" \
     || die "Infisical signing environment is not explicit"
