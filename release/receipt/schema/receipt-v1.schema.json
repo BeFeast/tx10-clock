@@ -1,0 +1,289 @@
+{
+  "$id": "https://github.com/BeFeast/tx10-clock/blob/main/release/receipt/schema/receipt-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Deterministic, public-safe record of one tx10-clock release delivery.",
+  "properties": {
+    "approval": {
+      "additionalProperties": false,
+      "description": "Who approved this delivery and when.",
+      "properties": {
+        "approved_at": {
+          "description": "UTC approval timestamp (YYYY-MM-DDThh:mm:ssZ).",
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+          "type": "string"
+        },
+        "approved_by": {
+          "description": "Operator identity slug that approved delivery.",
+          "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "approved_at",
+        "approved_by"
+      ],
+      "type": "object"
+    },
+    "artifact": {
+      "additionalProperties": false,
+      "description": "The delivered artifact and its digest.",
+      "properties": {
+        "filename": {
+          "description": "Bare artifact filename (no directory separators).",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}\\.apk$",
+          "type": "string"
+        },
+        "sha256": {
+          "description": "SHA-256 digest of the artifact, 64 lowercase hex chars.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "size_bytes": {
+          "description": "Artifact size in bytes.",
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "filename",
+        "sha256",
+        "size_bytes"
+      ],
+      "type": "object"
+    },
+    "delivery": {
+      "additionalProperties": false,
+      "description": "Delivery state and its full ordered history.",
+      "properties": {
+        "history": {
+          "description": "Ordered delivery state history, starting at 'built'.",
+          "items": {
+            "additionalProperties": false,
+            "description": "One delivery state change.",
+            "properties": {
+              "at": {
+                "description": "UTC timestamp the state was entered.",
+                "format": "date-time",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+                "type": "string"
+              },
+              "state": {
+                "description": "Delivery state entered.",
+                "enum": [
+                  "built",
+                  "published",
+                  "delivered",
+                  "rolled_back"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "at",
+              "state"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "state": {
+          "description": "Current delivery state.",
+          "enum": [
+            "built",
+            "published",
+            "delivered",
+            "rolled_back"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "history",
+        "state"
+      ],
+      "type": "object"
+    },
+    "package": {
+      "additionalProperties": false,
+      "description": "Package/version identity carried by the artifact.",
+      "properties": {
+        "application_id": {
+          "description": "Android application id of the package.",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$",
+          "type": "string"
+        },
+        "version_code": {
+          "description": "Package versionCode.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "version_name": {
+          "description": "Package versionName (MAJOR.MINOR.PATCH).",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "application_id",
+        "version_code",
+        "version_name"
+      ],
+      "type": "object"
+    },
+    "receipt_id": {
+      "description": "Stable lowercase slug identifying this receipt.",
+      "pattern": "^[a-z0-9][a-z0-9-]{7,63}$",
+      "type": "string"
+    },
+    "rollback": {
+      "additionalProperties": false,
+      "description": "Rollback record; null unless delivery.state is 'rolled_back'.",
+      "properties": {
+        "reason": {
+          "description": "Single-line printable-ASCII rollback reason.",
+          "pattern": "^[!-~](?:[ -~]{0,254}[!-~])?$",
+          "type": "string"
+        },
+        "reference": {
+          "description": "Receipt id or release tag restored by the rollback.",
+          "pattern": "^(?:v[0-9]+\\.[0-9]+\\.[0-9]+|[a-z0-9][a-z0-9-]{7,63})$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason",
+        "reference"
+      ],
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "schema_version": {
+      "description": "Receipt contract version this document claims to follow.",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "type": "string"
+    },
+    "signing": {
+      "additionalProperties": false,
+      "description": "Reference to the signing certificate by public fingerprint only.",
+      "properties": {
+        "certificate_sha256_fingerprint": {
+          "description": "Public SHA-256 certificate fingerprint reference: 32 colon-separated uppercase hex pairs. Never key material.",
+          "pattern": "^(?:[0-9A-F]{2}:){31}[0-9A-F]{2}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "certificate_sha256_fingerprint"
+      ],
+      "type": "object"
+    },
+    "source": {
+      "additionalProperties": false,
+      "description": "Exact public source identity of the release.",
+      "properties": {
+        "commit_sha": {
+          "description": "Exact 40-hex source commit the artifact was built at.",
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "release_tag": {
+          "description": "Release tag (vMAJOR.MINOR.PATCH) for the artifact.",
+          "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "type": "string"
+        },
+        "repository": {
+          "description": "GitHub owner/name the release was built from.",
+          "pattern": "^[A-Za-z0-9_.-]{1,64}/[A-Za-z0-9_.-]{1,64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "commit_sha",
+        "release_tag",
+        "repository"
+      ],
+      "type": "object"
+    },
+    "verification": {
+      "additionalProperties": false,
+      "description": "Post-delivery verification state.",
+      "properties": {
+        "state": {
+          "description": "Post-delivery verification state.",
+          "enum": [
+            "pending",
+            "passed",
+            "failed"
+          ],
+          "type": "string"
+        },
+        "verified_at": {
+          "description": "UTC verification timestamp, or null while pending.",
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "state",
+        "verified_at"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "approval",
+    "artifact",
+    "delivery",
+    "package",
+    "receipt_id",
+    "rollback",
+    "schema_version",
+    "signing",
+    "source",
+    "verification"
+  ],
+  "title": "tx10-clock-release-receipt",
+  "type": "object",
+  "x-contract": {
+    "error_codes": [
+      "format_invalid",
+      "hygiene_violation",
+      "io_error",
+      "json_invalid",
+      "missing_field",
+      "schema_version_unsupported",
+      "state_invalid",
+      "transition_invalid",
+      "type_invalid",
+      "unknown_field",
+      "usage_error"
+    ],
+    "hygiene_categories": [
+      "local_absolute_path",
+      "private_endpoint",
+      "credential_material"
+    ],
+    "semantic_rules": [
+      "delivery.history must start with state 'built'",
+      "consecutive delivery.history entries must follow built -> published -> delivered -> rolled_back with no skips, repeats, or reversals",
+      "delivery.history[*].at timestamps must be non-decreasing",
+      "delivery.state must equal the final delivery.history entry's state",
+      "verification.state 'passed' or 'failed' requires delivery.state 'delivered' or 'rolled_back'",
+      "verification.verified_at must be null exactly when verification.state is 'pending'",
+      "non-pending verification.verified_at must be at or after the delivered delivery.history entry",
+      "rollback must be non-null exactly when delivery.state is 'rolled_back'"
+    ],
+    "supported_schema_versions": [
+      "1.0.0"
+    ]
+  }
+}
