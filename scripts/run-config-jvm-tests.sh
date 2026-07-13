@@ -25,18 +25,23 @@ TST="app/src/test/java/com/befeast/tx10clock"
 
 # The Android-free sources and their tests — intentionally excludes the Android
 # shell (MainActivity, ClockView, BootReceiver, ...), which needs android.jar.
+# The pure burn-in offset engine rides along: it is likewise Android-free and
+# its bounds/cadence/determinism contract is verified under the same plain JVM.
 SOURCES=(
     "$SRC/ConfigException.java"
     "$SRC/Json.java"
     "$SRC/ExternalConfig.java"
     "$SRC/ConfigStore.java"
+    "$SRC/BurnInOffset.java"
     "$TST/ExternalConfigTest.java"
     "$TST/ConfigStoreTest.java"
+    "$TST/BurnInOffsetTest.java"
 )
 
 TESTS=(
     com.befeast.tx10clock.ExternalConfigTest
     com.befeast.tx10clock.ConfigStoreTest
+    com.befeast.tx10clock.BurnInOffsetTest
 )
 
 find_jar() {
