@@ -24,6 +24,13 @@ content_patterns=(
     'xox[baprs]-[A-Za-z0-9-]{10,}'        # Slack tokens
     'AKIA[0-9A-Z]{16}'                    # AWS access key ids
     'AIza[0-9A-Za-z_-]{35}'               # Google API keys
+    '\[\[Dev/'                            # Obsidian vault wikilinks (planning notes)
+    '^related_to:'                        # Obsidian frontmatter backlink key
+    '[Aa]pproval pending'                 # private acceptance/discussion trail
+    '[Dd]irectional interview'            # private interview trail
+    '\binterview\b'                       # private interview/discussion trail
+    'awaiting[[:space:]]+[A-Za-z]+[[:space:]]+acceptance'  # private approval trail
+    'Статус'                              # Cyrillic status label from private notes
 )
 
 # Tracked paths that should never exist in the repo (build output / local files).
