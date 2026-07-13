@@ -36,7 +36,8 @@ CI, and the release workflow all agree with that lock, enforced by
    passwords in Infisical — **never in git, never in GitHub secrets directly**.
    GitHub holds only the machine-identity credentials that let the runner read
    the store: secrets `INFISICAL_CLIENT_ID`, `INFISICAL_CLIENT_SECRET`;
-     variables `INFISICAL_API_URL`, `INFISICAL_PROJECT`, `RELEASE_SIGNING_KEY_REFERENCE`
+     variables `INFISICAL_API_URL`, `INFISICAL_PROJECT`,
+     `INFISICAL_ENVIRONMENT=prod`, `RELEASE_SIGNING_KEY_REFERENCE`
      (an `infisical://…` path). The store holds `TX10_RELEASE_KEYSTORE_B64`,
      `TX10_RELEASE_KEYSTORE_PASSWORD`, `TX10_RELEASE_KEY_ALIAS`,
      `TX10_RELEASE_KEY_PASSWORD`.
