@@ -26,6 +26,22 @@ public class ClockFormatTest {
     }
 
     @Test
+    public void hidingDateDropsOnlyTheCompactDate() {
+        // 12-hour keeps the AM/PM marker; only the date is removed.
+        assertEquals("PM ", ClockFormat.secondaryPrefix(REFERENCE, false, false));
+        assertEquals("PM 42", ClockFormat.secondary(REFERENCE, false, true, false));
+        assertEquals("PM", ClockFormat.secondary(REFERENCE, false, false, false));
+        // 24-hour has no AM/PM, so hiding the date leaves only the seconds.
+        assertEquals("", ClockFormat.secondaryPrefix(REFERENCE, true, false));
+        assertEquals("42", ClockFormat.secondary(REFERENCE, true, true, false));
+        assertEquals("", ClockFormat.secondary(REFERENCE, true, false, false));
+        // Showing the date is unchanged from the accepted contract fixtures.
+        assertEquals("PM SUN, JUL 12 ", ClockFormat.secondaryPrefix(REFERENCE, false, true));
+        assertEquals("PM SUN, JUL 12 42",
+                ClockFormat.secondary(REFERENCE, false, true, true));
+    }
+
+    @Test
     public void midnightNoonAndSecondsAreStable() {
         ZonedDateTime midnight = REFERENCE.withHour(0).withMinute(0).withSecond(5);
         ZonedDateTime noon = REFERENCE.withHour(12).withMinute(0).withSecond(0);

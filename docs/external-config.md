@@ -73,11 +73,11 @@ keys take their default. All fields are validated strictly (see below).
 | `dateColor`            | string  | `"grey"`       | Approved name for the compact date. |
 | `tickColor`            | string  | `"silver"`     | Approved name for the minor tick marks. |
 | `accentColor`          | string  | `"orange"`     | Approved name for the second hand and digital seconds. |
-| `showDate`             | boolean | `true`         | Show the compact English date (e.g. `SUN, JUL 12`). |
-| `digitalSizePercent`   | integer | `100`          | Main digital line size, `50`–`100` percent of the design size. |
-| `secondarySizePercent` | integer | `100`          | Secondary line size, `50`–`100` percent of the design size. |
-| `burnInEnabled`        | boolean | `true`         | Run the periodic whole-composition burn-in shift. |
-| `burnInMaxShiftPx`     | integer | `8`            | Maximum shift amplitude, `0`–`8` design pixels. |
+| `showDate`             | boolean | `true`         | Draw the compact English date (e.g. `SUN, JUL 12`) on the secondary line; when `false` the date is dropped (the 12-hour AM/PM marker stays). |
+| `digitalSizePercent`   | integer | `100`          | Main digital line size, `50`–`100` percent of the design size; shrinks the whole line uniformly about its anchor. |
+| `secondarySizePercent` | integer | `100`          | Secondary line size, `50`–`100` percent of the design size; shrinks the whole line uniformly about its anchor. |
+| `burnInEnabled`        | boolean | `true`         | Run the per-minute whole-composition burn-in shift. |
+| `burnInMaxShiftPx`     | integer | `8`            | Maximum shift amplitude, `0`–`8` design pixels; each axis is clamped to this, and `0` holds the composition still even when enabled. |
 
 ### Approved colour names
 
