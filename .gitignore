@@ -9,3 +9,4 @@ captures/
 *.jks
 *.apk
 *.aab
+__pycache__/
