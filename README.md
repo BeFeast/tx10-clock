@@ -5,7 +5,12 @@ analog + digital clock, stays stable, and shows the correct local time/date.
 
 Project: `BeFeast/tx10-clock`.
 
-![Reference render (1280x720)](app/src/test/resources/golden/clock_1280x720.png)
+![Non-binding renderer harness fixture (1280x720)](app/src/test/resources/golden/clock_1280x720.png)
+
+This image is a **non-binding test-harness fixture**. It proves deterministic
+offscreen rendering and pixel-diff diagnostics; it is not the accepted product
+visual contract. The production layout is implemented only from the separately
+operator-approved visual package.
 
 ## What this is
 
@@ -37,6 +42,12 @@ purity is what makes the golden test deterministic.
 ./gradlew assembleRelease        # build the release APK
 ./gradlew lint test              # Android Lint + unit/static/golden checks
 ```
+
+The scaffold's `assembleRelease` output is unsigned. CI may retain it under the
+explicit name `tx10-clock-unsigned-ci-verification-apk` for manifest and package
+inspection only; it is not installable and must not be attached to a GitHub
+Release. Release signing and the installable APK are delivered by issue
+[#5](https://github.com/BeFeast/tx10-clock/issues/5).
 
 The unit suite includes a **deterministic offscreen golden harness**
 ([`ClockRendererRenderTest`](app/src/test/java/com/befeast/tx10clock/ClockRendererRenderTest.java)):

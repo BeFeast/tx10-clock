@@ -13,6 +13,10 @@ concurrency:
 jobs:
   verify:
     name: Build, static checks & offscreen golden verifier
+    # This repository variable is set only after the operator has explicitly
+    # accepted the applicable Android SDK terms. Until then the Android job is
+    # intentionally skipped: CI must never manufacture legal acceptance.
+    if: ${{ vars.ANDROID_SDK_LICENSE_ACCEPTED == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -27,11 +31,11 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK packages (API 29)
-        run: |
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager "platform-tools" "platforms;android-29" "build-tools;29.0.3"
+        with:
+          # License acceptance is a human gate, not a CI side effect. The
+          # operator-gated runner image must already provide accepted licenses.
+          accept-android-sdk-licenses: false
+          packages: 'platform-tools platforms;android-29 build-tools;29.0.3'
 
       # Runs the documented outcome checks: clean build, Android Lint,
       # unit/static scene/format/config checks, the offscreen golden verifier,
@@ -57,10 +61,13 @@ jobs:
             app/build/test-results/
           if-no-files-found: ignore
 
-      - name: Upload release APK
+      - name: Upload unsigned APK for CI inspection only
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: tx10-clock-release-apk
-          path: app/build/outputs/apk/release/*.apk
+          # Signing/release distribution belongs to the release issue. This
+          # artifact is deliberately not installable and must not be published
+          # as a GitHub Release asset.
+          name: tx10-clock-unsigned-ci-verification-apk
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
           if-no-files-found: error
