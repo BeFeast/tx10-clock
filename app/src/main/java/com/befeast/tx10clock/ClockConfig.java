@@ -63,15 +63,15 @@ public final class ClockConfig {
 
     /** Fluent builder; every field defaults to the dark theme. */
     public static final class Builder {
-        private int backgroundColor = 0xFF0E1726; // deep navy
-        private int faceColor = 0xFF1B2A41;       // slate
-        private int tickColor = 0xFF7F8FA6;        // muted steel
-        private int hourHandColor = 0xFFECEFF4;    // near-white
-        private int minuteHandColor = 0xFFECEFF4;  // near-white
-        private int secondHandColor = 0xFF4FC3F7;  // cyan accent
-        private int digitalColor = 0xFFECEFF4;     // near-white
-        private int dateColor = 0xFF9AA5B1;        // soft grey
-        private boolean use24Hour = true;
+        private int backgroundColor = 0xFF000000; // pure black
+        private int faceColor = 0xFF000000;       // open, unfilled analog face
+        private int tickColor = 0xFFD1D1D6;
+        private int hourHandColor = 0xFFF5F5F7;
+        private int minuteHandColor = 0xFFF5F5F7;
+        private int secondHandColor = 0xFFFF9F0A;  // warm orange accent
+        private int digitalColor = 0xFFF5F5F7;
+        private int dateColor = 0xFFA1A1A6;
+        private boolean use24Hour = false;
         private boolean showSeconds = true;
 
         public Builder backgroundColor(int v) { this.backgroundColor = v; return this; }
