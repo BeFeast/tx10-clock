@@ -90,8 +90,17 @@ jobs:
           # Licence acceptance is a human gate, not a CI side effect. The
           # operator-gated runner image must already provide accepted licences.
           accept-android-sdk-licenses: false
+          # Disable setup-android's default package install; it supplies
+          # affirmative input to sdkmanager even when licence acceptance is off.
+          packages: ''
           cmdline-tools-version: ${{ env.ANDROID_CMDLINE_TOOLS_BUILD }}
-          packages: 'platform-tools platforms;android-${{ env.ANDROID_PLATFORM }} build-tools;${{ env.ANDROID_BUILD_TOOLS }}'
+
+      - name: Install pinned SDK packages without accepting licences
+        run: |
+          sdkmanager --install \
+            'platform-tools' \
+            'platforms;android-${{ env.ANDROID_PLATFORM }}' \
+            'build-tools;${{ env.ANDROID_BUILD_TOOLS }}' </dev/null
 
       - name: Enforce pinned release inputs
         run: bash scripts/check-release-pins.sh
@@ -143,8 +152,16 @@ jobs:
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
         with:
           accept-android-sdk-licenses: false
+          # See the reproducible-build job: package installs must happen only
+          # through our fail-closed </dev/null sdkmanager invocation below.
+          packages: ''
           cmdline-tools-version: ${{ env.ANDROID_CMDLINE_TOOLS_BUILD }}
-          packages: 'platforms;android-${{ env.ANDROID_PLATFORM }} build-tools;${{ env.ANDROID_BUILD_TOOLS }}'
+
+      - name: Install pinned SDK packages without accepting licences
+        run: |
+          sdkmanager --install \
+            'platforms;android-${{ env.ANDROID_PLATFORM }}' \
+            'build-tools;${{ env.ANDROID_BUILD_TOOLS }}' </dev/null
 
       - name: Download build A
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -185,6 +202,15 @@ jobs:
           tar -xzf "$archive" -C "$RUNNER_TEMP/infisical-bin" infisical
           chmod 0755 "$RUNNER_TEMP/infisical-bin/infisical"
           echo "$RUNNER_TEMP/infisical-bin" >> "$GITHUB_PATH"
+
+      - name: Require the configured CI signing provider
+        env:
+          SIGNING_KEY_REFERENCE: ${{ vars.RELEASE_SIGNING_KEY_REFERENCE }}
+        run: |
+          case "$SIGNING_KEY_REFERENCE" in
+            infisical://*) ;;
+            *) echo "::error::GitHub release signing requires an infisical:// reference"; exit 1 ;;
+          esac
 
       - name: Resolve signing material from the private stores (masked)
         env:

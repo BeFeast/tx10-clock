@@ -174,6 +174,7 @@ class PinnedToolchainMatchesBuildFiles(unittest.TestCase):
         self.assertNotIn("-storepass \"$RELEASE_KEYSTORE_PASSWORD\"", signer)
         with open(os.path.join(ROOT, "scripts", "release-resolve-signing.sh"), "r", encoding="utf-8") as fh:
             resolver = fh.read()
+        self.assertIn('export INFISICAL_DOMAIN="${INFISICAL_API_URL%/}"', resolver)
         self.assertIn('--env="$INFISICAL_ENVIRONMENT"', resolver)
 
     def test_release_inspector_treats_evidence_identity_as_fixed_strings(self):
