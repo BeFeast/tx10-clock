@@ -222,6 +222,7 @@ jobs:
           INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
           INFISICAL_API_URL: ${{ vars.INFISICAL_API_URL }}
           INFISICAL_PROJECT: ${{ vars.INFISICAL_PROJECT }}
+          INFISICAL_ENVIRONMENT: ${{ vars.INFISICAL_ENVIRONMENT }}
           SIGNING_KEY_REFERENCE: ${{ vars.RELEASE_SIGNING_KEY_REFERENCE }}
         run: bash scripts/release-resolve-signing.sh
 

@@ -126,6 +126,9 @@ if grep -Eq -- '--(client-secret|storepass|token)=' scripts/release-*.sh; then
 fi
 grep -Fq 'INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET' scripts/release-resolve-signing.sh \
     || die "Infisical Universal Auth secret is not sourced from environment"
+grep -Fq -- '--env="$INFISICAL_ENVIRONMENT"' scripts/release-resolve-signing.sh \
+    && grep -Fq 'INFISICAL_ENVIRONMENT: ${{ vars.INFISICAL_ENVIRONMENT }}' "$REL" \
+    || die "Infisical signing environment is not explicit"
 ok "release signing credentials remain out of process arguments"
 
 echo "check-release-pins: PASS — release inputs are pinned to the locked toolchain"
