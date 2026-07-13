@@ -173,8 +173,22 @@ class FormatTests(unittest.TestCase):
             self.check_rejected(lambda d, b=bad: d["source"].__setitem__("commit_sha", b))
 
     def test_artifact_sha256_must_be_64_lower_hex(self):
-        for bad in ("e" * 63, "E" * 64, "xyz", "sha256:" + "e" * 64):
+        for bad in (
+            "e" * 63,
+            "E" * 64,
+            "xyz",
+            "sha256:" + "e" * 64,
+            "e" * 64 + "\n",
+        ):
             self.check_rejected(lambda d, b=bad: d["artifact"].__setitem__("sha256", b))
+
+    def test_printable_line_rejects_final_newline(self):
+        doc, errors = vr.parse_receipt(
+            load_fixture("valid", "rolled-back-failed.json")
+        )
+        self.assertEqual(errors, [])
+        doc["rollback"]["reason"] += "\n"
+        self.assertIn("format_invalid", error_codes(vr.validate_document(doc)))
 
     def test_cert_fingerprint_must_be_colon_separated_uppercase(self):
         for bad in ("AA" * 32, ("aa:" * 31) + "aa", ("AA:" * 30) + "AA"):
@@ -241,6 +255,15 @@ class SemanticTests(unittest.TestCase):
         doc = valid_doc()
         doc["verification"]["verified_at"] = None
         self.assertIn("state_invalid", error_codes(vr.validate_document(doc)))
+
+    def test_verified_at_must_not_precede_delivered_history(self):
+        doc = valid_doc()
+        doc["verification"]["verified_at"] = "2026-07-03T08:59:59Z"
+        errors = vr.validate_document(doc)
+        self.assertIn("state_invalid", error_codes(errors))
+        self.assertTrue(
+            any(error["path"] == "$.verification.verified_at" for error in errors)
+        )
 
 
 class HygieneTests(unittest.TestCase):

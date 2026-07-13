@@ -279,6 +279,7 @@
       "delivery.state must equal the final delivery.history entry's state",
       "verification.state 'passed' or 'failed' requires delivery.state 'delivered' or 'rolled_back'",
       "verification.verified_at must be null exactly when verification.state is 'pending'",
+      "non-pending verification.verified_at must be at or after the delivered delivery.history entry",
       "rollback must be non-null exactly when delivery.state is 'rolled_back'"
     ],
     "supported_schema_versions": [

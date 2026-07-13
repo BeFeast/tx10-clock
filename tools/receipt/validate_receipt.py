@@ -73,6 +73,8 @@ SEMANTIC_RULES = (
     "'delivered' or 'rolled_back'",
     "verification.verified_at must be null exactly when verification.state "
     "is 'pending'",
+    "non-pending verification.verified_at must be at or after the delivered "
+    "delivery.history entry",
     "rollback must be non-null exactly when delivery.state is 'rolled_back'",
 )
 
@@ -327,7 +329,7 @@ def _check_node(spec, value, path, errors):
         if not isinstance(value, str):
             errors.append(_error("type_invalid", path, "value must be a string"))
             return
-        if not re.match(spec["pattern"], value):
+        if re.fullmatch(spec["pattern"], value) is None:
             errors.append(
                 _error("format_invalid", path, "value does not match required format")
             )
@@ -461,6 +463,22 @@ def _check_semantics(doc, errors):
                 "verified_at must be null exactly when verification is 'pending'",
             )
         )
+    if (
+        verification["state"] in ("passed", "failed")
+        and state in ("delivered", "rolled_back")
+        and verification["verified_at"] is not None
+    ):
+        delivered_at = next(
+            step["at"] for step in history if step["state"] == "delivered"
+        )
+        if _parse_utc(verification["verified_at"]) < _parse_utc(delivered_at):
+            errors.append(
+                _error(
+                    "state_invalid",
+                    "$.verification.verified_at",
+                    "verified_at must not precede the delivered history entry",
+                )
+            )
     if (state == "rolled_back") != (rollback is not None):
         errors.append(
             _error(
