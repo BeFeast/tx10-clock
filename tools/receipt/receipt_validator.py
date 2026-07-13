@@ -343,7 +343,9 @@ _HYGIENE_RULES = [
     ("hygiene_credential", "aws_access_key_id",
      re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
     ("hygiene_credential", "github_token",
-     re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}")),
+     re.compile(
+         r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b"
+     )),
     ("hygiene_credential", "slack_token",
      re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}")),
     ("hygiene_credential", "google_api_key",
@@ -362,7 +364,7 @@ _HYGIENE_RULES = [
      re.compile(r"[a-zA-Z][a-zA-Z0-9+.-]*://[^/\s:@]+:[^/\s@]+@")),
     # --- private endpoints / LAN addresses ---
     ("hygiene_private_endpoint", "loopback",
-     re.compile(r"(?i)\b(?:localhost|127\.0\.0\.1|::1)\b")),
+     re.compile(r"(?i)\b(?:localhost|127\.(?:\d{1,3}\.){2}\d{1,3}|::1)\b")),
     ("hygiene_private_endpoint", "rfc1918_10",
      re.compile(r"\b10\.(?:\d{1,3})\.(?:\d{1,3})\.(?:\d{1,3})\b")),
     ("hygiene_private_endpoint", "rfc1918_192_168",

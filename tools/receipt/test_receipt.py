@@ -104,6 +104,26 @@ class SchemaTest(unittest.TestCase):
             schema["properties"]["signing"]["required"],
         )
 
+    def test_source_commit_is_exactly_40_lowercase_hex(self):
+        schema = rv.load_schema()
+        commit_schema = schema["properties"]["source"]["properties"]["commit"]
+        self.assertEqual(commit_schema["pattern"], "^[0-9a-f]{40}$")
+
+        invalid_commits = {
+            "short": "a" * 39,
+            "long": "a" * 41,
+            "uppercase": "A" * 40,
+            "colon-containing": ("a" * 20) + ":" + ("b" * 19),
+            "non-hex": "g" * 40,
+        }
+        fixture = os.path.join(VALID_DIR, "planned.receipt.json")
+        for case, value in invalid_commits.items():
+            with self.subTest(case=case):
+                receipt = _read_json(fixture)
+                receipt["source"]["commit"] = value
+                errors = rv.validate_receipt(receipt, schema)
+                self.assertIn("pattern_invalid", {error.code for error in errors})
+
 
 class ValidFixtureTest(unittest.TestCase):
     def test_valid_fixtures_have_no_errors(self):
@@ -140,6 +160,32 @@ class InvalidFixtureTest(unittest.TestCase):
                     self.expected[name],
                     codes,
                     f"{name}: expected {self.expected[name]}, got {sorted(codes)}",
+                )
+
+
+class HygieneEdgeCaseTest(unittest.TestCase):
+    def _receipt_with_note(self, note):
+        receipt = _read_json(os.path.join(VALID_DIR, "planned.receipt.json"))
+        receipt["note"] = note
+        return receipt
+
+    def test_fine_grained_github_pat_is_rejected_without_echoing_it(self):
+        token = "github_pat_" + ("example_" * 4)
+        receipt = self._receipt_with_note(token)
+        errors = rv.validate_receipt(receipt)
+        self.assertIn("hygiene_credential", {error.code for error in errors})
+
+        proc = _run_cli("-", stdin=json.dumps(receipt))
+        self.assertEqual(proc.returncode, 1)
+        self.assertNotIn(token, proc.stdout)
+
+    def test_entire_ipv4_loopback_range_is_rejected(self):
+        for address in ("127.0.0.2", "127.1.2.3", "127.255.255.255"):
+            with self.subTest(address=address):
+                receipt = self._receipt_with_note(f"endpoint http://{address}:5555")
+                errors = rv.validate_receipt(receipt)
+                self.assertIn(
+                    "hygiene_private_endpoint", {error.code for error in errors}
                 )
 
 

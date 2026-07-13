@@ -48,7 +48,7 @@
         "commit": {
           "description": "Full 40-hex source commit SHA-1.",
           "type": "string",
-          "pattern": "^[0-9a-f:]+$"
+          "pattern": "^[0-9a-f]{40}$"
         },
         "ref": {
           "description": "Fully-qualified git ref the build came from, e.g. refs/tags/v1.2.0.",
