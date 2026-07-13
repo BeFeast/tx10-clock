@@ -1,0 +1,76 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.befeast.tx10clock'
+    compileSdk 29
+
+    defaultConfig {
+        applicationId "com.befeast.tx10clock"
+        minSdk 29
+        targetSdk 29
+        versionCode 1
+        versionName "0.1.0"
+
+        // No NDK / no native code: force an empty ABI filter set so the packaged
+        // APK never contains lib/**. The app is pure Java + Android Canvas and
+        // therefore runs unchanged on the TX10's 32-bit armeabi-v7a runtime.
+        ndk {
+            abiFilters.clear()
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        // compileSdk 29 caps the language level at Java 8. That is sufficient:
+        // java.time is available natively from minSdk 29 (API 26+), so no
+        // desugaring is required.
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    lint {
+        abortOnError true
+        warningsAsErrors false
+        checkReleaseBuilds true
+        // This app deliberately targets SDK 29 to match the TX10 Pro runtime and
+        // is side-loaded, not distributed via Google Play, so the Play-Store
+        // "target a newer API" policy check does not apply.
+        disable 'ExpiredTargetSdkVersion'
+        // Emit machine-readable reports so CI/verify-outcome can archive them.
+        xmlReport true
+        textReport true
+    }
+
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+            returnDefaultValues = true
+        }
+    }
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    // Robolectric provides the declared API 29 JVM test environment. NATIVE
+    // graphics mode renders real ARGB_8888 pixels offscreen (no device needed).
+    testImplementation 'org.robolectric:robolectric:4.11.1'
+}
+
+// Wire the golden harness' input/output locations to stable absolute paths so
+// they resolve regardless of the test JVM working directory, and forward the
+// opt-in record flag (./gradlew test -Dgolden.record=true regenerates goldens).
+tasks.withType(Test).configureEach {
+    systemProperty 'golden.record', System.getProperty('golden.record', 'false')
+    systemProperty 'golden.record.dir',
+            project.file('src/test/resources/golden').absolutePath
+    systemProperty 'golden.output.dir',
+            layout.buildDirectory.dir('golden-output').get().asFile.absolutePath
+}

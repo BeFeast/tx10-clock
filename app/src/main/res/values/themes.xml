@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fullscreen, no action bar, black background: the clock owns the whole
+         screen. Built only on the platform theme so no AndroidX/Material
+         dependency (and therefore no extra native libraries) is pulled in. -->
+    <style name="Theme.Tx10Clock" parent="@android:style/Theme.Black.NoTitleBar.Fullscreen">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>
