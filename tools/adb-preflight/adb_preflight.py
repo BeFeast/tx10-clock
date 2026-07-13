@@ -197,6 +197,24 @@ class Redactor:
         return text
 
 
+def redact_values(value, redactor):
+    """Redact known-sensitive substrings from every string leaf of a
+    JSON-serializable value, leaving numbers, booleans, None, dict keys, and
+    structure untouched.
+
+    Applied to the report BEFORE serialization: redacting the serialized JSON
+    text would rewrite unquoted numeric fields too (a short serial equal to
+    "29" would corrupt "min_api": 29 into invalid JSON), whereas redacting
+    string leaves keeps the report valid and machine-readable."""
+    if isinstance(value, str):
+        return redactor.redact(value)
+    if isinstance(value, list):
+        return [redact_values(v, redactor) for v in value]
+    if isinstance(value, dict):
+        return {k: redact_values(v, redactor) for k, v in value.items()}
+    return value
+
+
 def fingerprint(salt, value):
     digest = hashlib.sha256()
     digest.update(salt.encode("utf-8"))
@@ -410,8 +428,13 @@ def _launcher_check(runner):
     # --brief prints a match-details line first; the component follows.
     component = next((l.strip() for l in out.splitlines()
                       if _COMPONENT_RE.match(l.strip())), None)
-    return _check("launcher-state", "pass",
-                  "home=%s" % (component or "unrecognized"))
+    if component is None:
+        # resolve-activity succeeded but named no component (e.g. "No activity
+        # found"). The documented prerequisite is that the current HOME
+        # activity resolves, so an unresolved launcher is a failure, not a pass.
+        return _check("launcher-state", "fail",
+                      "current HOME activity did not resolve")
+    return _check("launcher-state", "pass", "home=%s" % component)
 
 
 def _storage_check(runner, min_free_kib):
@@ -543,13 +566,29 @@ def run_preflight(env, argv):
         "ok": ok,
     }
 
-    # Deterministic serialization; final redaction pass as defence in depth.
+    # Defence-in-depth redaction pass. Applied to string leaves before
+    # serialization so numeric fields stay intact and the output is valid JSON.
+    report = redact_values(report, redactor)
+    # The fingerprint is a non-reversible token that is safe to expose; restore
+    # it verbatim in case a short serial happened to be a substring of its hash.
+    report["target"]["fingerprint"] = (
+        fingerprint_value if (resolved or target) else None)
+
+    # Deterministic serialization (sorted keys, fixed order, no timestamps).
     text = json.dumps(report, sort_keys=True, indent=2) + "\n"
-    text = redactor.redact(text)
 
     if out_path:
-        with open(out_path, "w", encoding="utf-8") as handle:
-            handle.write(text)
+        try:
+            with open(out_path, "w", encoding="utf-8") as handle:
+                handle.write(text)
+        except OSError as exc:
+            # A bad --out destination (a directory, a missing parent, an
+            # unwritable path) is a configuration error, not an unmet device
+            # prerequisite. Still emit the report to stdout so it is not lost,
+            # then fail cleanly instead of surfacing a traceback.
+            sys.stdout.write(text)
+            raise UsageError("cannot write report to --out path: %s"
+                             % (exc.strerror or "write failed"))
     sys.stdout.write(text)
 
     failed = sum(1 for c in checks if c["status"] != "pass")

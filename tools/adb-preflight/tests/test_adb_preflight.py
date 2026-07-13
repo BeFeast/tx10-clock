@@ -257,6 +257,23 @@ class PrerequisiteFailureTests(PreflightHarness):
                              {"stdout": "\n"}, "clock-timezone")
         self.assertEqual(check["status"], "fail")
 
+    def test_unresolved_home_activity_fails(self):
+        # resolve-activity succeeds but names no component: the current HOME
+        # activity did not resolve, so launcher-state must fail (not pass with
+        # home=unrecognized) and the overall report must be unsuccessful.
+        check = self.failing(RESOLVE_HOME_KEY,
+                             {"stdout": "No activity found\n"},
+                             "launcher-state")
+        self.assertEqual(check["status"], "fail")
+        self.assertNotIn("unrecognized", check["detail"])
+
+    def test_empty_property_value_fails_without_crashing(self):
+        # An allowlisted query that exits 0 with empty stdout must produce a
+        # failed prerequisite check, never terminate the tool without its JSON.
+        check = self.failing("shell getprop ro.build.version.sdk",
+                             {"stdout": ""}, "android-api")
+        self.assertEqual(check["status"], "fail")
+
 
 class HostileOutputTests(PreflightHarness):
 
@@ -317,6 +334,35 @@ class RedactionAndTargetHandlingTests(PreflightHarness):
         result = self.run_tool(success_spec())
         self.assertEqual(result.returncode, 0)
         self.assert_no_leak(result, FAKE_ADB, os.path.dirname(FAKE_ADB))
+
+    def test_short_serial_keeps_report_valid_json(self):
+        # A short serial that collides with a numeric field ("29" == min_api)
+        # must not corrupt the machine-readable report: redaction applies to
+        # string values only, so unquoted numbers stay intact and stdout parses.
+        result = self.run_tool(success_spec(), target="29")
+        report = self.report(result)  # fails the test if stdout is not JSON
+        self.assertEqual(report["requirements"]["min_api"], 29)
+        self.assertIsInstance(report["requirements"]["min_api"], int)
+
+
+class OutputWritingTests(PreflightHarness):
+
+    def test_out_file_matches_stdout(self):
+        out_path = os.path.join(self.scenario, "report.json")
+        result = self.run_tool(success_spec(), args=["--out", out_path])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with open(out_path, encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), result.stdout)
+
+    def test_unwritable_out_path_is_a_clean_config_error(self):
+        # --out naming a directory raises OSError on write; the tool must not
+        # emit a traceback or masquerade as an unmet prerequisite. It emits the
+        # JSON report on stdout and exits with the usage/configuration code.
+        result = self.run_tool(success_spec(), args=["--out", self.scenario])
+        self.assertEqual(result.returncode, 2)
+        self.report(result)  # stdout still carries the JSON report
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertNotIn("Traceback", result.stdout)
 
 
 class ReadOnlyContractTests(PreflightHarness):
