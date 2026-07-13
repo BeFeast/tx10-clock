@@ -1,7 +1,7 @@
 package com.befeast.tx10clock;
 
 import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 
 import android.os.Build;
 
@@ -56,17 +56,19 @@ public class ClockViewBurnInTest {
     }
 
     @Test
-    public void smallerMaxClampsEachAxis() {
+    public void smallerMaxUsesItsOwnBoundedGrid() {
         assertArrayEquals(new int[]{-2, -2},
                 ClockView.burnInTranslation(withBurnIn(true, 2), CORNER));
     }
 
     @Test
-    public void boundedShiftClampsSymmetrically() {
-        assertEquals(2, ClockView.boundedShift(8, 2));
-        assertEquals(-2, ClockView.boundedShift(-8, 2));
-        assertEquals(1, ClockView.boundedShift(1, 2));
-        assertEquals(0, ClockView.boundedShift(0, 8));
-        assertEquals(8, ClockView.boundedShift(8, 8));
+    public void smallerMaxStillChangesAtEveryMinuteBoundary() {
+        for (int minute = 0; minute < 25; minute++) {
+            int[] current = ClockView.burnInTranslation(
+                    withBurnIn(true, 2), CORNER.plusMinutes(minute));
+            int[] next = ClockView.burnInTranslation(
+                    withBurnIn(true, 2), CORNER.plusMinutes(minute + 1));
+            assertNotEquals(current[0] + "," + current[1], next[0] + "," + next[1]);
+        }
     }
 }

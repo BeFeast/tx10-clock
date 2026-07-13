@@ -3,6 +3,7 @@ package com.befeast.tx10clock;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertThrows;
 
 import org.junit.Test;
 
@@ -137,5 +138,32 @@ public class BurnInOffsetTest {
         assertEquals(8, BurnInOffset.BOUND_PX);
         assertEquals(60, BurnInOffset.CADENCE_SECONDS);
         assertEquals(17 * 17, BurnInOffset.CYCLE_MINUTES);
+    }
+
+    @Test
+    public void configuredBoundsKeepChangingEveryMinuteAcrossTheirCycle() {
+        for (int bound = 1; bound <= BurnInOffset.BOUND_PX; bound++) {
+            int span = 2 * bound + 1;
+            int cycle = span * span;
+            Set<String> seen = new HashSet<>();
+            for (long minute = 0; minute < cycle; minute++) {
+                BurnInOffset current = BurnInOffset.forMinuteIndex(minute, bound);
+                BurnInOffset next = BurnInOffset.forMinuteIndex(minute + 1, bound);
+                assertTrue(Math.abs(current.x) <= bound && Math.abs(current.y) <= bound);
+                assertTrue("position revisited for bound " + bound,
+                        seen.add(current.x + "," + current.y));
+                assertNotEquals("no change for bound " + bound + " at " + minute,
+                        current, next);
+            }
+            assertEquals(cycle, seen.size());
+        }
+    }
+
+    @Test
+    public void configuredBoundMustStayInsideAcceptedEnvelope() {
+        assertThrows(IllegalArgumentException.class,
+                () -> BurnInOffset.forMinuteIndex(0, -1));
+        assertThrows(IllegalArgumentException.class,
+                () -> BurnInOffset.forMinuteIndex(0, BurnInOffset.BOUND_PX + 1));
     }
 }

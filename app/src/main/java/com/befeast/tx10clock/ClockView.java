@@ -70,20 +70,7 @@ public final class ClockView extends View {
         if (!config.burnInEnabled || config.burnInMaxShiftPx <= 0) {
             return new int[]{0, 0};
         }
-        BurnInOffset offset = BurnInOffset.at(now);
-        return new int[]{
-                boundedShift(offset.x, config.burnInMaxShiftPx),
-                boundedShift(offset.y, config.burnInMaxShiftPx)};
-    }
-
-    /** Clamp a raw offset component to +/- the configured maximum amplitude. */
-    static int boundedShift(int raw, int maxPx) {
-        if (raw > maxPx) {
-            return maxPx;
-        }
-        if (raw < -maxPx) {
-            return -maxPx;
-        }
-        return raw;
+        BurnInOffset offset = BurnInOffset.at(now, config.burnInMaxShiftPx);
+        return new int[]{offset.x, offset.y};
     }
 }
