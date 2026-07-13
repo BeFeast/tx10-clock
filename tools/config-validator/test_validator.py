@@ -17,6 +17,7 @@ import re
 import subprocess
 import sys
 import unittest
+from copy import deepcopy
 from pathlib import Path
 
 import clock_config_validator as validator
@@ -63,6 +64,9 @@ class SchemaSelfChecks(unittest.TestCase):
         # 12h/24h selection, seconds + date visibility.
         self.assertEqual(
             set(props["display"]["properties"]["hourCycle"]["enum"]), {"12h", "24h"}
+        )
+        self.assertEqual(
+            props["display"]["properties"]["hourCycle"]["default"], "12h"
         )
         self.assertIn("showSeconds", props["display"]["properties"])
         self.assertIn("showDate", props["display"]["properties"])
@@ -125,18 +129,26 @@ class PositiveFixtures(unittest.TestCase):
         self.assertEqual(validator.validate_to_canonical(spaced), baseline)
         self.assertEqual(validator.validate_to_canonical(compact), baseline)
 
-    def test_minimal_expands_to_full_defaults(self):
-        canonical = validator.validate_to_canonical(b'{"schemaVersion": 1}')
+    def test_minimal_config_normalizes_to_approved_12h_default(self):
+        minimal = VALID_DIR / "minimal.json"
+        expected = VALID_DIR / "minimal-normalized.json"
+
+        normalized = validator.validate(minimal.read_bytes())
+        self.assertEqual(normalized["display"]["hourCycle"], "12h")
         self.assertEqual(
-            canonical,
-            '{"analog":{"smoothSweep":true},'
-            '"burnInMitigation":{"shiftEnabled":true,'
-            '"shiftIntervalSeconds":60,"shiftRadiusPx":8},'
-            '"display":{"hourCycle":"24h","showDate":true,"showSeconds":true},'
-            '"locale":{"language":"system","timeZone":"auto"},'
-            '"runtime":{"allowManualRefresh":false,"keepScreenOn":true,'
-            '"restoreOnBoot":true},"schemaVersion":1}\n',
+            validator.canonicalize(normalized),
+            validator.canonicalize(json.loads(expected.read_bytes())),
         )
+
+    def test_schema_defaults_are_validated_by_normalizer(self):
+        schema = deepcopy(validator.load_schema())
+        schema["properties"]["display"]["properties"]["hourCycle"]["default"] = (
+            "invalid-cycle"
+        )
+
+        with self.assertRaises(validator.ConfigValidationError) as raised:
+            validator.validate(b'{"schemaVersion": 1}', schema)
+        self.assertEqual(raised.exception.pointer, "/display/hourCycle")
 
 
 class NegativeFixtures(unittest.TestCase):

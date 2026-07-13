@@ -18,10 +18,10 @@
       "additionalProperties": false,
       "properties": {
         "hourCycle": {
-          "description": "12-hour or 24-hour digital time.",
+          "description": "12-hour digital time by default, with 24-hour time available as an explicit option.",
           "type": "string",
           "enum": ["12h", "24h"],
-          "default": "24h"
+          "default": "12h"
         },
         "showSeconds": {
           "description": "Whether the digital readout shows seconds.",

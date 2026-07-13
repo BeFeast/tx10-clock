@@ -4,7 +4,7 @@ Versioned configuration contract for the TX10 Clock app.
 
 - [`clock-config.v1.schema.json`](clock-config.v1.schema.json) — the **v1**
   contract (JSON Schema 2020-12). It is the single source of truth for the app
-  configuration surface: 12h/24h selection, digital seconds/date visibility,
+  configuration surface: 12h-by-default/optional-24h selection, digital seconds/date visibility,
   locale/timezone policy, smooth analog sweep, burn-in shift enable/radius/
   interval, and safe refresh/runtime booleans.
 
@@ -17,6 +17,11 @@ and interval) are behavioural safety limits, not accepted product geometry.
 `schemaVersion` is required and, for this file, must equal `1`. A future
 breaking change ships as a new `clock-config.v2.schema.json` with
 `schemaVersion == 2`; documents are never silently coerced across versions.
+
+## Default hour cycle
+
+An omitted `display.hourCycle` normalizes to `12h`, matching the approved
+product default with AM/PM. `24h` remains available only when explicitly set.
 
 ## Enforcement
 

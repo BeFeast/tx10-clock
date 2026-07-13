@@ -13,8 +13,9 @@ fail-closed passes that plain JSON Schema does not express:
     tokens and non-finite floats produced by overflowing numeric literals).
 
 On success it emits a deterministic canonical JSON document: every optional field
-is filled from the schema defaults, keys are sorted, and the encoding is compact
-and ASCII-only, so identical meaning always produces identical bytes. Because the
+is filled from, and validated against, the schema defaults (including the approved
+12-hour display default), keys are sorted, and the encoding is compact and
+ASCII-only, so identical meaning always produces identical bytes. Because the
 schema forbids unknown fields and constrains every value, the canonical output
 structurally cannot carry an endpoint, serial, secret, private path, or device
 identity.
@@ -170,7 +171,12 @@ def _normalize_object(value, schema: dict, pointer: str):
         if name in value:
             result[name] = _normalize(value[name], subschema, child_pointer)
         elif "default" in subschema:
-            result[name] = deepcopy(subschema["default"])
+            # Defaults are data too: run them through the same type/enum/range
+            # checks as user input so a malformed schema cannot silently emit
+            # an invalid canonical document.
+            result[name] = _normalize(
+                deepcopy(subschema["default"]), subschema, child_pointer
+            )
         elif subschema.get("type") == "object":
             # Fill an absent optional sub-object with its own defaults so the
             # canonical output is always the same fully-populated shape.

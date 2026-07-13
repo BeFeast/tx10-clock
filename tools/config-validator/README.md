@@ -60,6 +60,10 @@ and every value is bounded or pattern-restricted, the canonical output
 structurally cannot carry an endpoint, serial, secret, private path, or device
 identity.
 
+Defaults are validated through the same type/enum/range checks as supplied
+values. In particular, a minimal `{"schemaVersion": 1}` document normalizes to
+`display.hourCycle == "12h"`; `24h` remains a valid explicit override.
+
 ## Timezone / locale policy
 
 `timeZone` and `language` each accept either a device-delegated policy token
