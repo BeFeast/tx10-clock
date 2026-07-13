@@ -11,12 +11,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  android-sdk-license-gate:
+    name: Android SDK license acceptance gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Block until operator acceptance is recorded
+        if: ${{ vars.ANDROID_SDK_LICENSE_ACCEPTED != 'true' }}
+        run: |
+          echo "::error::Android SDK terms have not been explicitly accepted by the operator."
+          exit 1
+
+      - name: Confirm recorded operator acceptance
+        if: ${{ vars.ANDROID_SDK_LICENSE_ACCEPTED == 'true' }}
+        run: echo "Recorded Android SDK license gate is open."
+
   verify:
     name: Build, static checks & offscreen golden verifier
-    # This repository variable is set only after the operator has explicitly
-    # accepted the applicable Android SDK terms. Until then the Android job is
-    # intentionally skipped: CI must never manufacture legal acceptance.
-    if: ${{ vars.ANDROID_SDK_LICENSE_ACCEPTED == 'true' }}
+    # No Android action executes until the explicit operator gate above passes.
+    needs: android-sdk-license-gate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
