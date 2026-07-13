@@ -22,6 +22,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Keep hands-on preview installs separate from the final signed app.
+            applicationIdSuffix ".preview"
+            versionNameSuffix "-preview"
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'

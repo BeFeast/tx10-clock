@@ -6,137 +6,179 @@ import android.graphics.Typeface;
 
 import java.time.ZonedDateTime;
 
-/**
- * Draws the analog + digital clock onto a {@link Canvas}.
- *
- * <p>This class is the production renderer. It is a pure function of
- * ({@link ClockConfig}, size, {@link ZonedDateTime}) &rarr; pixels, holding no
- * mutable frame state beyond reusable {@link Paint} objects. That purity is
- * what lets the golden harness draw it offscreen into a fixed-size
- * {@code ARGB_8888} bitmap and diff the result deterministically.
- */
+/** Native Canvas implementation of visual contract v0.1.0. */
 public final class ClockRenderer {
 
-    private final ClockConfig config;
+    private static final float DESIGN_WIDTH = 1280f;
+    private static final float DESIGN_HEIGHT = 720f;
+    private static final float ANALOG_X = 318f;
+    private static final float ANALOG_Y = 360f;
+    private static final float DIGITAL_X = 941f;
 
-    private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final ClockConfig config;
     private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
 
     public ClockRenderer(ClockConfig config) {
         this.config = config;
         stroke.setStyle(Paint.Style.STROKE);
         stroke.setStrokeCap(Paint.Cap.ROUND);
-        text.setTextAlign(Paint.Align.CENTER);
-        text.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL));
+        fill.setStyle(Paint.Style.FILL);
+        text.setStyle(Paint.Style.FILL);
     }
 
     public ClockConfig config() {
         return config;
     }
 
-    /**
-     * Render one frame. Safe to call repeatedly with any size; all geometry is
-     * derived from {@code width}/{@code height}.
-     */
+    /** Draw one frame, letterboxed from the binding 1280x720 design surface. */
     public void render(Canvas canvas, int width, int height, ZonedDateTime now) {
         canvas.drawColor(config.backgroundColor);
+        if (width <= 0 || height <= 0) {
+            return;
+        }
 
-        final float faceRadius = Math.min(width, height) * 0.33f;
-        final float cx = width * 0.5f;
-        final float cy = height * 0.40f;
+        float scale = Math.min(width / DESIGN_WIDTH, height / DESIGN_HEIGHT);
+        float offsetX = (width - DESIGN_WIDTH * scale) / 2f;
+        float offsetY = (height - DESIGN_HEIGHT * scale) / 2f;
 
-        drawFace(canvas, cx, cy, faceRadius);
-        drawTicks(canvas, cx, cy, faceRadius);
-        drawHands(canvas, cx, cy, faceRadius, now);
-        drawHub(canvas, cx, cy, faceRadius);
-        drawDigital(canvas, width, height, now);
+        int save = canvas.save();
+        canvas.translate(offsetX, offsetY);
+        canvas.scale(scale, scale);
+        drawTicks(canvas);
+        drawNumerals(canvas);
+        drawHands(canvas, now);
+        drawHub(canvas);
+        drawDigital(canvas, now);
+        canvas.restoreToCount(save);
     }
 
-    private void drawFace(Canvas canvas, float cx, float cy, float r) {
-        fill.setColor(config.faceColor);
-        fill.setStyle(Paint.Style.FILL);
-        canvas.drawCircle(cx, cy, r, fill);
-
-        stroke.setColor(config.tickColor);
-        stroke.setStrokeWidth(r * 0.02f);
-        canvas.drawCircle(cx, cy, r, stroke);
-    }
-
-    private void drawTicks(Canvas canvas, float cx, float cy, float r) {
-        stroke.setColor(config.tickColor);
+    private void drawTicks(Canvas canvas) {
         for (int i = 0; i < 60; i++) {
-            final boolean hour = (i % 5) == 0;
-            final float inner = hour ? r * 0.84f : r * 0.90f;
-            final float outer = r * 0.96f;
-            stroke.setStrokeWidth(hour ? r * 0.025f : r * 0.010f);
+            boolean major = i % 5 == 0;
+            double angle = Math.toRadians(i * 6.0);
+            float sin = (float) Math.sin(angle);
+            float cos = (float) Math.cos(angle);
+            float inner = major ? 243f : 253f;
+            float outer = 267f;
 
-            final double a = Math.toRadians(i * 6.0);
-            final float sin = (float) Math.sin(a);
-            final float cos = (float) Math.cos(a);
+            stroke.setColor(major ? config.digitalColor : config.tickColor);
+            stroke.setAlpha(major ? 255 : 184);
+            stroke.setStrokeWidth(major ? 6f : 3f);
             canvas.drawLine(
-                    cx + sin * inner, cy - cos * inner,
-                    cx + sin * outer, cy - cos * outer,
+                    ANALOG_X + sin * inner, ANALOG_Y - cos * inner,
+                    ANALOG_X + sin * outer, ANALOG_Y - cos * outer,
                     stroke);
         }
+        stroke.setAlpha(255);
     }
 
-    private void drawHands(Canvas canvas, float cx, float cy, float r, ZonedDateTime now) {
-        final int hour = now.getHour() % 12;
-        final int minute = now.getMinute();
-        final int second = now.getSecond();
+    private void drawNumerals(Canvas canvas) {
+        text.setColor(config.digitalColor);
+        text.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+        text.setFakeBoldText(false);
+        text.setTextSize(48f);
+        text.setTextScaleX(1f);
+        text.setLetterSpacing(0f);
+        text.setTextAlign(Paint.Align.CENTER);
 
-        final double hourAngle = Math.toRadians((hour + minute / 60.0) * 30.0);
-        final double minuteAngle = Math.toRadians((minute + second / 60.0) * 6.0);
-        final double secondAngle = Math.toRadians(second * 6.0);
-
-        stroke.setColor(config.hourHandColor);
-        stroke.setStrokeWidth(r * 0.045f);
-        drawHand(canvas, cx, cy, hourAngle, r * 0.52f, r * 0.12f);
-
-        stroke.setColor(config.minuteHandColor);
-        stroke.setStrokeWidth(r * 0.030f);
-        drawHand(canvas, cx, cy, minuteAngle, r * 0.78f, r * 0.16f);
-
-        if (config.showSeconds) {
-            stroke.setColor(config.secondHandColor);
-            stroke.setStrokeWidth(r * 0.015f);
-            drawHand(canvas, cx, cy, secondAngle, r * 0.86f, r * 0.20f);
+        Paint.FontMetrics metrics = text.getFontMetrics();
+        float baselineOffset = -(metrics.ascent + metrics.descent) / 2f;
+        for (int hour = 1; hour <= 12; hour++) {
+            int index = hour % 12;
+            double angle = Math.toRadians(index * 30.0);
+            float x = ANALOG_X + (float) Math.sin(angle) * 216f;
+            float y = ANALOG_Y - (float) Math.cos(angle) * 216f;
+            canvas.drawText(Integer.toString(hour), x, y + baselineOffset, text);
         }
     }
 
-    /** Draws a hand of {@code length} that overshoots the hub by {@code tail}. */
-    private void drawHand(Canvas canvas, float cx, float cy, double angle,
-                          float length, float tail) {
-        final float sin = (float) Math.sin(angle);
-        final float cos = (float) Math.cos(angle);
+    private void drawHands(Canvas canvas, ZonedDateTime now) {
+        double seconds = now.getSecond() + now.getNano() / 1_000_000_000.0;
+        double minutes = now.getMinute() + seconds / 60.0;
+        double hours = (now.getHour() % 12) + minutes / 60.0;
+
+        drawHand(canvas, Math.toRadians(hours * 30.0), 116f, 19f,
+                18f, config.hourHandColor);
+        drawHand(canvas, Math.toRadians(minutes * 6.0), 180f, 24f,
+                13f, config.minuteHandColor);
+        if (config.showSeconds) {
+            drawHand(canvas, Math.toRadians(seconds * 6.0), 216f, 30f,
+                    4f, config.secondHandColor);
+        }
+    }
+
+    private void drawHand(Canvas canvas, double angle, float length, float tail,
+                          float width, int color) {
+        float sin = (float) Math.sin(angle);
+        float cos = (float) Math.cos(angle);
+        stroke.setColor(color);
+        stroke.setAlpha(255);
+        stroke.setStrokeWidth(width);
         canvas.drawLine(
-                cx - sin * tail, cy + cos * tail,
-                cx + sin * length, cy - cos * length,
+                ANALOG_X - sin * tail, ANALOG_Y + cos * tail,
+                ANALOG_X + sin * length, ANALOG_Y - cos * length,
                 stroke);
     }
 
-    private void drawHub(Canvas canvas, float cx, float cy, float r) {
-        fill.setStyle(Paint.Style.FILL);
+    private void drawHub(Canvas canvas) {
         fill.setColor(config.secondHandColor);
-        canvas.drawCircle(cx, cy, r * 0.045f, fill);
+        canvas.drawCircle(ANALOG_X, ANALOG_Y, 11f, fill);
         fill.setColor(config.backgroundColor);
-        canvas.drawCircle(cx, cy, r * 0.020f, fill);
+        canvas.drawCircle(ANALOG_X, ANALOG_Y, 4f, fill);
     }
 
-    private void drawDigital(Canvas canvas, int width, int height, ZonedDateTime now) {
-        final float timeSize = height * 0.135f;
-        final float dateSize = height * 0.052f;
-        final float cx = width * 0.5f;
+    private void drawDigital(Canvas canvas, ZonedDateTime now) {
+        String main = ClockFormat.main(now, config.use24Hour);
+        configureMainText();
+        float referenceWidth = text.measureText(config.use24Hour ? "22:09" : "10:09");
+        if (referenceWidth > 0f) {
+            text.setTextScaleX(535f / referenceWidth);
+        }
+        text.setTextAlign(Paint.Align.CENTER);
+        canvas.drawText(main, DIGITAL_X, 377f, text);
 
-        text.setColor(config.digitalColor);
-        text.setTextSize(timeSize);
-        text.setFakeBoldText(true);
-        canvas.drawText(ClockFormat.time(now, config), cx, height * 0.88f, text);
+        String prefix = ClockFormat.secondaryPrefix(now, config.use24Hour);
+        String seconds = config.showSeconds ? ClockFormat.seconds(now) : "";
+        configureSecondaryText();
+        float naturalWidth = text.measureText(prefix) + text.measureText(seconds);
+        float targetWidth = config.use24Hour ? 495f : 535f;
+        if (naturalWidth > 0f) {
+            text.setTextScaleX(targetWidth / naturalWidth);
+        }
 
+        float prefixWidth = text.measureText(prefix);
+        float secondsWidth = text.measureText(seconds);
+        float startX = DIGITAL_X - (prefixWidth + secondsWidth) / 2f;
+        text.setTextAlign(Paint.Align.LEFT);
         text.setColor(config.dateColor);
-        text.setTextSize(dateSize);
+        canvas.drawText(prefix, startX, 447f, text);
+        if (!seconds.isEmpty()) {
+            text.setColor(config.secondHandColor);
+            canvas.drawText(seconds, startX + prefixWidth, 447f, text);
+        }
+
+        text.setTextScaleX(1f);
+        text.setLetterSpacing(0f);
+        text.setTextAlign(Paint.Align.CENTER);
+    }
+
+    private void configureMainText() {
+        text.setColor(config.digitalColor);
+        text.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
         text.setFakeBoldText(false);
-        canvas.drawText(ClockFormat.date(now), cx, height * 0.96f, text);
+        text.setTextSize(190f);
+        text.setTextScaleX(1f);
+        text.setLetterSpacing(-7f / 190f);
+    }
+
+    private void configureSecondaryText() {
+        text.setColor(config.dateColor);
+        text.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        text.setFakeBoldText(false);
+        text.setTextSize(38f);
+        text.setTextScaleX(1f);
+        text.setLetterSpacing(2f / 38f);
     }
 }
