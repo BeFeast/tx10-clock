@@ -365,6 +365,14 @@ _HYGIENE_RULES = [
     # --- private endpoints / LAN addresses ---
     ("hygiene_private_endpoint", "loopback",
      re.compile(r"(?i)\b(?:localhost|127\.(?:\d{1,3}\.){2}\d{1,3}|::1)\b")),
+    ("hygiene_private_endpoint", "private_ipv6",
+     re.compile(
+         r"(?i)(?:"
+         r"\[(?:::1|(?:f[cd][0-9a-f]{2}|fe[89ab][0-9a-f]):[0-9a-f:.]+)\]"
+         r"|(?<![0-9a-f:])(?:::1|(?:f[cd][0-9a-f]{2}|fe[89ab][0-9a-f]):"
+         r"[0-9a-f:]+)(?![0-9a-f:])"
+         r")"
+     )),
     ("hygiene_private_endpoint", "rfc1918_10",
      re.compile(r"\b10\.(?:\d{1,3})\.(?:\d{1,3})\.(?:\d{1,3})\b")),
     ("hygiene_private_endpoint", "rfc1918_192_168",

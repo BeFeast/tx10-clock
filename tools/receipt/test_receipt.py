@@ -12,6 +12,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -188,6 +189,22 @@ class HygieneEdgeCaseTest(unittest.TestCase):
                     "hygiene_private_endpoint", {error.code for error in errors}
                 )
 
+    def test_private_ipv6_endpoints_are_rejected(self):
+        endpoints = (
+            "http://[fd00::1]/artifact",
+            "http://[fdaa:bbcc::1234]/artifact",
+            "http://[fe80::1]/debug",
+            "http://[febf::1]/debug",
+            "http://[::1]/debug",
+        )
+        for endpoint in endpoints:
+            with self.subTest(endpoint=endpoint):
+                receipt = self._receipt_with_note(endpoint)
+                errors = rv.validate_receipt(receipt)
+                self.assertIn(
+                    "hygiene_private_endpoint", {error.code for error in errors}
+                )
+
 
 class CliContractTest(unittest.TestCase):
     def test_valid_fixture_exits_zero(self):
@@ -208,6 +225,52 @@ class CliContractTest(unittest.TestCase):
     def test_missing_file_exits_two(self):
         proc = _run_cli(os.path.join(INVALID_DIR, "does-not-exist.json"))
         self.assertEqual(proc.returncode, 2)
+
+    def test_invalid_utf8_exits_two_without_traceback_or_path_leak(self):
+        path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                prefix="tx10-receipt-", suffix=".json", delete=False
+            ) as fixture:
+                fixture.write(b'{"note":"\xff"}')
+                path = fixture.name
+
+            proc = _run_cli(path)
+            self.assertEqual(proc.returncode, 2)
+            self.assertNotIn("Traceback", proc.stderr)
+            self.assertNotIn(path, proc.stdout + proc.stderr)
+            report = json.loads(proc.stdout)
+            self.assertEqual(
+                report["results"][0]["errors"][0]["code"], "decode_error"
+            )
+        finally:
+            if path is not None:
+                os.unlink(path)
+
+    def test_success_output_uses_basename_not_absolute_input_path(self):
+        path = None
+        try:
+            receipt = _read_text(os.path.join(VALID_DIR, "planned.receipt.json"))
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                prefix="tx10-receipt-",
+                suffix=".json",
+                delete=False,
+            ) as fixture:
+                fixture.write(receipt)
+                path = fixture.name
+
+            proc = _run_cli(path)
+            self.assertEqual(proc.returncode, 0)
+            self.assertNotIn(path, proc.stdout + proc.stderr)
+            self.assertEqual(
+                json.loads(proc.stdout)["results"][0]["target"],
+                os.path.basename(path),
+            )
+        finally:
+            if path is not None:
+                os.unlink(path)
 
     def test_output_is_byte_stable(self):
         args = _list_json(INVALID_DIR)

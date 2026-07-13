@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 
 import receipt_validator as rv
@@ -70,9 +71,33 @@ def main(argv=None):
 
     try:
         schema = rv.load_schema(args.schema)
-    except (OSError, json.JSONDecodeError) as exc:
+    except OSError:
         _emit({"ok": False, "errors": [
-            {"code": "schema_load_error", "path": "(schema)", "message": str(exc)}
+            {
+                "code": "schema_load_error",
+                "path": "(schema)",
+                "message": "could not read schema",
+            }
+        ]})
+        return 2
+    except UnicodeDecodeError:
+        _emit({"ok": False, "errors": [
+            {
+                "code": "schema_load_error",
+                "path": "(schema)",
+                "message": "schema is not valid UTF-8",
+            }
+        ]})
+        return 2
+    except json.JSONDecodeError as exc:
+        _emit({"ok": False, "errors": [
+            {
+                "code": "schema_load_error",
+                "path": "(schema)",
+                "message": (
+                    f"invalid schema JSON at line {exc.lineno} column {exc.colno}"
+                ),
+            }
         ]})
         return 2
 
@@ -81,19 +106,35 @@ def main(argv=None):
     hard_error = False
 
     for name in args.receipts:
+        display = "(stdin)" if name == "-" else os.path.basename(name)
         try:
             if name == "-":
                 text = sys.stdin.read()
-                display = "(stdin)"
             else:
                 with open(name, "r", encoding="utf-8") as fh:
                     text = fh.read()
-                display = name
-        except OSError as exc:
+        except OSError:
             results.append({
-                "target": name,
+                "target": display,
                 "ok": False,
-                "errors": [{"code": "io_error", "path": "(file)", "message": str(exc)}],
+                "errors": [{
+                    "code": "io_error",
+                    "path": "(file)",
+                    "message": "could not read receipt",
+                }],
+            })
+            all_ok = False
+            hard_error = True
+            continue
+        except UnicodeDecodeError:
+            results.append({
+                "target": display,
+                "ok": False,
+                "errors": [{
+                    "code": "decode_error",
+                    "path": "(file)",
+                    "message": "receipt is not valid UTF-8",
+                }],
             })
             all_ok = False
             hard_error = True
