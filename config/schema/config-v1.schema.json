@@ -1,0 +1,276 @@
+{
+  "$id": "https://github.com/BeFeast/tx10-clock/blob/main/config/schema/config-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Deterministic, public-safe tx10-clock host configuration.",
+  "properties": {
+    "burnIn": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "shiftEnabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "shiftEnabled"
+            ]
+          },
+          "then": {
+            "properties": {
+              "shiftRadiusPx": {
+                "minimum": 1
+              }
+            }
+          }
+        }
+      ],
+      "description": "Burn-in mitigation shift settings.",
+      "properties": {
+        "shiftEnabled": {
+          "description": "Whether the periodic burn-in pixel shift is enabled.",
+          "type": "boolean"
+        },
+        "shiftIntervalSeconds": {
+          "description": "Whole seconds between burn-in shifts.",
+          "maximum": 86400,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "shiftRadiusPx": {
+          "description": "Burn-in shift radius in pixels.",
+          "maximum": 64,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "shiftEnabled",
+        "shiftIntervalSeconds",
+        "shiftRadiusPx"
+      ],
+      "type": "object"
+    },
+    "clock": {
+      "additionalProperties": false,
+      "description": "Clock face and digital readout behaviour.",
+      "properties": {
+        "analogSweep": {
+          "description": "Analog second-hand motion: 'smooth' sweep or 'tick'.",
+          "enum": [
+            "smooth",
+            "tick"
+          ],
+          "type": "string"
+        },
+        "hourCycle": {
+          "description": "Digital readout hour cycle: 'h12' (12-hour) or 'h24'.",
+          "enum": [
+            "h12",
+            "h24"
+          ],
+          "type": "string"
+        },
+        "showDate": {
+          "description": "Whether the digital date line is shown.",
+          "type": "boolean"
+        },
+        "showSeconds": {
+          "description": "Whether the seconds field and second hand are shown.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "analogSweep",
+        "hourCycle",
+        "showDate",
+        "showSeconds"
+      ],
+      "type": "object"
+    },
+    "locale": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "tag": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "policy": {
+                "const": "fixed"
+              }
+            },
+            "required": [
+              "policy"
+            ]
+          },
+          "then": {
+            "properties": {
+              "tag": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ],
+      "description": "Locale selection policy.",
+      "properties": {
+        "policy": {
+          "description": "Locale source: follow the 'device' or use a 'fixed' tag.",
+          "enum": [
+            "device",
+            "fixed"
+          ],
+          "type": "string"
+        },
+        "tag": {
+          "description": "BCP-47 locale tag; null unless policy is 'fixed'.",
+          "maxLength": 35,
+          "pattern": "^[A-Za-z]{2,3}(?:-[A-Za-z]{4})?(?:-(?:[A-Za-z]{2}|[0-9]{3}))?(?:-(?:[A-Za-z0-9]{5,8}|[0-9][A-Za-z0-9]{3}))*(?:-[0-9A-WY-Za-wy-z](?:-[A-Za-z0-9]{2,8})+)*(?:-[Xx](?:-[A-Za-z0-9]{1,8})+)?$",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "policy",
+        "tag"
+      ],
+      "type": "object"
+    },
+    "runtime": {
+      "additionalProperties": false,
+      "description": "Safe runtime behaviour toggles.",
+      "properties": {
+        "bootStart": {
+          "description": "Whether the clock auto-starts after device boot.",
+          "type": "boolean"
+        },
+        "keepScreenOn": {
+          "description": "Whether the screen is held on while the clock is foreground.",
+          "type": "boolean"
+        },
+        "safeRefresh": {
+          "description": "Whether the conservative low-flicker refresh path is used.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "bootStart",
+        "keepScreenOn",
+        "safeRefresh"
+      ],
+      "type": "object"
+    },
+    "schemaVersion": {
+      "description": "Config contract version this document claims to follow.",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "type": "string"
+    },
+    "timeZone": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "id": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "policy": {
+                "const": "fixed"
+              }
+            },
+            "required": [
+              "policy"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ],
+      "description": "Time-zone selection policy.",
+      "properties": {
+        "id": {
+          "description": "IANA time-zone id; null unless policy is 'fixed'.",
+          "maxLength": 64,
+          "pattern": "^(?:UTC|[A-Za-z][A-Za-z0-9+_-]*(?:/[A-Za-z0-9+_-]+){1,2})$",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "policy": {
+          "description": "Time-zone source: follow the 'device' or use a 'fixed' id.",
+          "enum": [
+            "device",
+            "fixed"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "policy"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "burnIn",
+    "clock",
+    "locale",
+    "runtime",
+    "schemaVersion",
+    "timeZone"
+  ],
+  "title": "tx10-clock-config",
+  "type": "object",
+  "x-contract": {
+    "error_codes": [
+      "format_invalid",
+      "hygiene_violation",
+      "io_error",
+      "json_invalid",
+      "missing_field",
+      "oversized",
+      "range_invalid",
+      "schema_version_unsupported",
+      "state_invalid",
+      "type_invalid",
+      "unknown_field",
+      "usage_error"
+    ],
+    "hygiene_categories": [
+      "local_absolute_path",
+      "private_endpoint",
+      "credential_material"
+    ],
+    "max_document_bytes": 8192,
+    "max_nesting_depth": 32,
+    "semantic_rules": [
+      "locale.tag must be a valid tag exactly when locale.policy is 'fixed', and null when locale.policy is 'device'",
+      "timeZone.id must be a valid id exactly when timeZone.policy is 'fixed', and null when timeZone.policy is 'device'",
+      "burnIn.shiftRadiusPx must be at least 1 when burnIn.shiftEnabled is true"
+    ],
+    "supported_schema_versions": [
+      "1.0.0"
+    ]
+  }
+}
