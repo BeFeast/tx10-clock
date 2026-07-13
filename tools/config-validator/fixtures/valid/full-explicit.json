@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "display": {
+    "hourCycle": "12h",
+    "showSeconds": false,
+    "showDate": true
+  },
+  "locale": {
+    "timeZone": "America/New_York",
+    "language": "en-US"
+  },
+  "analog": {
+    "smoothSweep": false
+  },
+  "burnInMitigation": {
+    "shiftEnabled": true,
+    "shiftRadiusPx": 16,
+    "shiftIntervalSeconds": 120
+  },
+  "runtime": {
+    "keepScreenOn": true,
+    "restoreOnBoot": false,
+    "allowManualRefresh": true
+  }
+}

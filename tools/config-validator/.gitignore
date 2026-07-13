@@ -1,0 +1,3 @@
+# Python bytecode cache produced by running the validator/tests.
+__pycache__/
+*.pyc

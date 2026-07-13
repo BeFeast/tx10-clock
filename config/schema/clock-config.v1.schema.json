@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:befeast:tx10-clock:clock-config:v1",
+  "title": "TX10 Clock configuration (v1)",
+  "description": "Versioned, strict, bounded host-side configuration contract for the TX10 Clock app. This document is the single source of truth for the config surface; the host-only validator in tools/config-validator enforces it plus fail-closed passes (duplicate keys, NaN/Infinity, byte-size limit) that plain JSON Schema does not express. It intentionally carries no visual geometry/tokens, no endpoints, and no device identity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion"],
+  "properties": {
+    "schemaVersion": {
+      "description": "Contract version. Must equal 1 for this schema; a mismatch fails closed rather than being coerced.",
+      "type": "integer",
+      "const": 1
+    },
+    "display": {
+      "description": "Digital readout presentation.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hourCycle": {
+          "description": "12-hour or 24-hour digital time.",
+          "type": "string",
+          "enum": ["12h", "24h"],
+          "default": "24h"
+        },
+        "showSeconds": {
+          "description": "Whether the digital readout shows seconds.",
+          "type": "boolean",
+          "default": true
+        },
+        "showDate": {
+          "description": "Whether the date line is shown.",
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "locale": {
+      "description": "Locale / timezone policy. Each field accepts either a device-delegated policy token or a shape-validated explicit value; unsafe input fails closed. Existence is deferred to the runtime — this contract validates safety and shape only, without shipping a timezone database.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeZone": {
+          "description": "'auto' delegates to the device zone. Otherwise an IANA-style zone id (e.g. 'UTC', 'Europe/London', 'America/Argentina/Buenos_Aires', 'Etc/GMT+5'). Path traversal, separators, whitespace, and shell metacharacters are rejected.",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^(auto|UTC|Etc/GMT[+-][0-9]{1,2}|[A-Za-z]+(?:/[A-Za-z0-9_+-]+){1,2})$",
+          "default": "auto"
+        },
+        "language": {
+          "description": "'system' delegates to the device locale. Otherwise a BCP-47 language tag (e.g. 'en', 'en-US', 'pt-BR', 'zh-Hant-TW').",
+          "type": "string",
+          "maxLength": 35,
+          "pattern": "^(system|[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)$",
+          "default": "system"
+        }
+      }
+    },
+    "analog": {
+      "description": "Analog face behaviour.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "smoothSweep": {
+          "description": "Smooth (continuous) second-hand sweep when true; discrete one-second ticks when false.",
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "burnInMitigation": {
+      "description": "OLED/LCD burn-in shift. Bounds here are behavioural safety limits, not accepted visual geometry.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "shiftEnabled": {
+          "description": "Whether the whole scene is periodically nudged to spread pixel wear.",
+          "type": "boolean",
+          "default": true
+        },
+        "shiftRadiusPx": {
+          "description": "Maximum displacement of the periodic shift, in pixels. 0 disables movement even when shiftEnabled is true.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 64,
+          "default": 8
+        },
+        "shiftIntervalSeconds": {
+          "description": "How often the scene is shifted, in seconds. Bounded to keep the effect gentle and infrequent.",
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 21600,
+          "default": 60
+        }
+      }
+    },
+    "runtime": {
+      "description": "Safe runtime / refresh booleans.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "keepScreenOn": {
+          "description": "Hold a wake lock so the clock never sleeps.",
+          "type": "boolean",
+          "default": true
+        },
+        "restoreOnBoot": {
+          "description": "Relaunch the clock automatically after device boot.",
+          "type": "boolean",
+          "default": true
+        },
+        "allowManualRefresh": {
+          "description": "Permit a manual redraw/refresh input. Off by default so the surface stays passive.",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  }
+}

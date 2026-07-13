@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "burnInMitigation": {
+    "shiftIntervalSeconds": Infinity
+  }
+}

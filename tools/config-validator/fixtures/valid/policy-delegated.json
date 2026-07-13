@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "display": {
+    "hourCycle": "24h",
+    "showSeconds": true,
+    "showDate": false
+  },
+  "locale": {
+    "timeZone": "auto",
+    "language": "system"
+  },
+  "burnInMitigation": {
+    "shiftEnabled": false,
+    "shiftRadiusPx": 0
+  }
+}

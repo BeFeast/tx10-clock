@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1,
+  "display": { "hourCycle": "24h" },
+  "display": { "hourCycle": "12h" }
+}

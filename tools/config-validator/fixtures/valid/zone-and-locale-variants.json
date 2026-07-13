@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "locale": {
+    "timeZone": "America/Argentina/Buenos_Aires",
+    "language": "zh-Hant-TW"
+  },
+  "burnInMitigation": {
+    "shiftEnabled": true,
+    "shiftRadiusPx": 64,
+    "shiftIntervalSeconds": 21600
+  }
+}
