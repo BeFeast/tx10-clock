@@ -43,7 +43,9 @@ resolve_sdk() {
     fi
     if [ -f local.properties ]; then
         local sdk
-        sdk="$(sed -n 's/^sdk\.dir=//p' local.properties | head -1 || true)"
+        # Accept any Gradle-valid `sdk.dir` entry, including surrounding
+        # whitespace (e.g. `sdk.dir = /opt/android-sdk`).
+        sdk="$(sed -n 's/^[[:space:]]*sdk\.dir[[:space:]]*=[[:space:]]*//p' local.properties | head -1 || true)"
         if [ -n "$sdk" ] && [ -d "$sdk/platforms" ]; then export ANDROID_SDK_ROOT="$sdk"; return; fi
     fi
     local cand
@@ -70,25 +72,33 @@ ok "gradle clean + lint + unit/static/golden + release build"
 APK="app/build/outputs/apk/release/app-release-unsigned.apk"
 [ -f "$APK" ] || die "release APK not found at $APK"
 
+# Package/version/target-SDK metadata is a mandatory part of the release
+# contract, so a missing badging tool is a hard failure — never a silent skip
+# that could report success for a non-conforming APK. Prefer aapt; fall back to
+# `aapt2 dump badging` (compatible output) when only aapt2 is installed.
 AAPT="$(ls "$ANDROID_SDK_ROOT"/build-tools/*/aapt 2>/dev/null | sort -V | tail -1 || true)"
+AAPT2="$(ls "$ANDROID_SDK_ROOT"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1 || true)"
 if [ -n "$AAPT" ] && [ -x "$AAPT" ]; then
-    log "APK manifest / package metadata"
     BADGING="$("$AAPT" dump badging "$APK")"
-    printf '%s\n' "$BADGING" | grep -E "package:|sdkVersion|targetSdkVersion|launchable-activity|native-code" || true
-
-    printf '%s\n' "$BADGING" | grep -q "package: name='com.befeast.tx10clock'" \
-        || die "unexpected package id (want com.befeast.tx10clock)"
-    printf '%s\n' "$BADGING" | grep -q "versionName='0.1.0'" \
-        || die "unexpected versionName (want 0.1.0 — the v0.1.0 artifact)"
-    printf '%s\n' "$BADGING" | grep -q "targetSdkVersion:'29'" \
-        || die "unexpected targetSdkVersion (want 29)"
-    if printf '%s\n' "$BADGING" | grep -q "native-code:"; then
-        die "APK declares native-code"
-    fi
-    ok "package com.befeast.tx10clock, versionName 0.1.0, SDK 29, no native-code"
+elif [ -n "$AAPT2" ] && [ -x "$AAPT2" ]; then
+    BADGING="$("$AAPT2" dump badging "$APK")"
 else
-    log "aapt not found — skipping badging assertions (no-lib check below still runs)"
+    die "aapt/aapt2 not found in $ANDROID_SDK_ROOT/build-tools — cannot verify APK package metadata"
 fi
+
+log "APK manifest / package metadata"
+printf '%s\n' "$BADGING" | grep -E "package:|sdkVersion|targetSdkVersion|launchable-activity|native-code" || true
+
+printf '%s\n' "$BADGING" | grep -q "package: name='com.befeast.tx10clock'" \
+    || die "unexpected package id (want com.befeast.tx10clock)"
+printf '%s\n' "$BADGING" | grep -q "versionName='0.1.0'" \
+    || die "unexpected versionName (want 0.1.0 — the v0.1.0 artifact)"
+printf '%s\n' "$BADGING" | grep -q "targetSdkVersion:'29'" \
+    || die "unexpected targetSdkVersion (want 29)"
+if printf '%s\n' "$BADGING" | grep -q "native-code:"; then
+    die "APK declares native-code"
+fi
+ok "package com.befeast.tx10clock, versionName 0.1.0, SDK 29, no native-code"
 
 log "APK native-library check (no lib/**)"
 scripts/check-no-native-libs.sh "$APK" || die "APK contains native libraries"
