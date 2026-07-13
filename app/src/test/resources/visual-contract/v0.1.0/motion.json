@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "analog": {
+    "second_hand": {
+      "motion": "continuous",
+      "angle_degrees": "6 * (second + millisecond / 1000)",
+      "target_refresh_hz": 60,
+      "must_not_step_once_per_second": true
+    },
+    "minute_hand": {
+      "motion": "continuous",
+      "angle_degrees": "6 * (minute + second / 60 + millisecond / 60000)"
+    },
+    "hour_hand": {
+      "motion": "continuous",
+      "angle_degrees": "30 * (hour_mod_12 + minute / 60 + second / 3600 + millisecond / 3600000)"
+    }
+  },
+  "digital": {
+    "seconds_update": "once per wall-clock second",
+    "date_update": "at local-date boundary",
+    "timezone_source": "device zone; acceptance target Asia/Jerusalem"
+  },
+  "burn_in": {
+    "motion": "discrete whole-composition translation",
+    "cadence_seconds": 60,
+    "bounds_px": 8,
+    "transition": "instant between bounded deterministic positions"
+  }
+}

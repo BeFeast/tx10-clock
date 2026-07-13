@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "contract_version": "0.1.0",
+  "state": "accepted",
+  "created_at": "2026-07-13T08:51:00Z",
+  "viewport_px": [
+    1280,
+    720
+  ],
+  "package_digest_algorithm": "sha256 of the lexicographically filename-sorted sha256sum records for content_files",
+  "package_sha256": "26f19604851ba5192e9125cd03396208a8c1e4941e0b6396ac990db33b5248b0",
+  "source_package_sha256": "6c506c95d8b49e79a819d05e8bc021777507cf45810eb97fa41741c719f78105",
+  "sanitized_for_public_release": [
+    "README.md",
+    "assets.json"
+  ],
+  "content_files": {
+    "README.md": "50d198632366be1299b4c80f238b6d99174a345f1cbec268c02122528b7b6d29",
+    "assets.json": "cbff4b7bd665d9b8c0b87a38efee32049222cae6fa75da26fa37c2839fc253f0",
+    "comparison.json": "3205e6f4076ecb3d9d935d99d16b82906242267ba42fdc1b882de8bf0b2e4d94",
+    "content-fixtures.json": "70202225e1c5c2998bd40abe8bb5a40efc6579bd6a07e4afcec88c7d305abffa",
+    "geometry.json": "21f7dd2e290f62b8b340cebb85eba541d07eae53a4f29d5a835a71b025e05baa",
+    "motion.json": "28fd66addec67c20732cd38cd9198ecdcc6d8580e85165f7694efad1613c77d6",
+    "reference-12h-1280x720.png": "dd9cfa007b8965d49c315f1a6fb7b8fd2121425fa187f93fee9e5458dd960ecf",
+    "reference-12h-1280x720.svg": "218959deb7dcc9545befd2e9e93818fb96bc67df30d7b6cd7d2f35fef24420a1",
+    "reference-24h-1280x720.png": "3e48fa025a91144efc843425bfdbd89bc95b29223da2d1c13427f2dd42d5aafc",
+    "reference-24h-overlay.svg": "b55d0c2fea922f2b615cfafda4eeabd58da57f951fbf4f36c101100c8e7394ae",
+    "reference-burnin-minus8-1280x720.png": "4d95a424fa875acdf5a74700eb2cd3c383d3137478e66e6aab4641b2987f64fb",
+    "reference-burnin-plus8-1280x720.png": "68d421f71b1b0edf26f7e254b49e79cab54700c5897808281c2665e3be38ac37",
+    "tokens.json": "e0daf26748ca5e73f4100c5943ebe252d948bfdf77c15db827b2ba29ecbdc3b0"
+  },
+  "approval": {
+    "state": "accepted",
+    "evidence": "BeFeast/tx10-clock#2"
+  }
+}
