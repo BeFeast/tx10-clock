@@ -721,6 +721,9 @@ def _node_to_json_schema(spec):
 
 def emit_schema():
     schema = _node_to_json_schema(SPEC)
+    # A standard JSON Schema validator must reject unsupported contract
+    # versions, just like validate_document().  x-contract is metadata only.
+    schema["properties"]["schemaVersion"]["const"] = SUPPORTED_SCHEMA_VERSIONS[0]
     schema.update(
         {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
