@@ -335,6 +335,16 @@ class RedactionAndTargetHandlingTests(PreflightHarness):
         self.assertEqual(result.returncode, 0)
         self.assert_no_leak(result, FAKE_ADB, os.path.dirname(FAKE_ADB))
 
+    def test_adb_command_name_resolves_through_path(self):
+        path = TESTS_DIR + os.pathsep + os.environ.get("PATH", "")
+        result = self.run_tool(
+            success_spec(),
+            adb=os.path.basename(FAKE_ADB),
+            env_overrides={"PATH": path},
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(self.report(result)["ok"])
+
     def test_short_serial_keeps_report_valid_json(self):
         # A short serial that collides with a numeric field ("29" == min_api)
         # must not corrupt the machine-readable report: redaction applies to

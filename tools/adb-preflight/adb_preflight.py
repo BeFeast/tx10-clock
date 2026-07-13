@@ -515,7 +515,11 @@ def run_preflight(env, argv):
     if target_err:
         raise UsageError(target_err)
 
-    adb_path = env.get("TX10_ADB", "").strip() or shutil.which("adb")
+    configured_adb = env.get("TX10_ADB", "").strip()
+    if configured_adb and not os.path.dirname(configured_adb):
+        adb_path = shutil.which(configured_adb)
+    else:
+        adb_path = configured_adb or shutil.which("adb")
     if adb_path:
         # The adb location may embed private host paths; never report it.
         redactor.add(adb_path, "[adb]")
