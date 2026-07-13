@@ -6,6 +6,27 @@
   "properties": {
     "burnIn": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "shiftEnabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "shiftEnabled"
+            ]
+          },
+          "then": {
+            "properties": {
+              "shiftRadiusPx": {
+                "minimum": 1
+              }
+            }
+          }
+        }
+      ],
       "description": "Burn-in mitigation shift settings.",
       "properties": {
         "shiftEnabled": {
@@ -71,6 +92,34 @@
     },
     "locale": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "tag": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "policy": {
+                "const": "fixed"
+              }
+            },
+            "required": [
+              "policy"
+            ]
+          },
+          "then": {
+            "properties": {
+              "tag": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ],
       "description": "Locale selection policy.",
       "properties": {
         "policy": {
@@ -84,7 +133,7 @@
         "tag": {
           "description": "BCP-47 locale tag; null unless policy is 'fixed'.",
           "maxLength": 35,
-          "pattern": "^[A-Za-z]{2,3}(?:-[A-Za-z]{4})?(?:-(?:[A-Za-z]{2}|[0-9]{3}))?$",
+          "pattern": "^[A-Za-z]{2,3}(?:-[A-Za-z]{4})?(?:-(?:[A-Za-z]{2}|[0-9]{3}))?(?:-(?:[A-Za-z0-9]{5,8}|[0-9][A-Za-z0-9]{3}))*(?:-[0-9A-WY-Za-wy-z](?:-[A-Za-z0-9]{2,8})+)*(?:-[Xx](?:-[A-Za-z0-9]{1,8})+)?$",
           "type": [
             "string",
             "null"
@@ -128,6 +177,34 @@
     },
     "timeZone": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "id": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "policy": {
+                "const": "fixed"
+              }
+            },
+            "required": [
+              "policy"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ],
       "description": "Time-zone selection policy.",
       "properties": {
         "id": {
@@ -186,6 +263,7 @@
       "credential_material"
     ],
     "max_document_bytes": 8192,
+    "max_nesting_depth": 32,
     "semantic_rules": [
       "locale.tag must be a valid tag exactly when locale.policy is 'fixed', and null when locale.policy is 'device'",
       "timeZone.id must be a valid id exactly when timeZone.policy is 'fixed', and null when timeZone.policy is 'device'",

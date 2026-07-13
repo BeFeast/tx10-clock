@@ -54,6 +54,11 @@ and unknown fields are rejected.
 - `burnIn.shiftRadiusPx` must be at least `1` when `burnIn.shiftEnabled` is
   `true`.
 
+These rules are encoded in the schema as draft-2020-12 `if`/`then`/`else`
+conditions, so a standard schema validator rejects the same negatives the
+CLI does — schema-based authoring cannot produce a document that then fails at
+ingestion.
+
 ### Fail-closed ingestion
 
 A document is accepted only if it passes every check. Everything else is
@@ -61,7 +66,11 @@ rejected with a nonzero exit and a machine-readable reason:
 
 - **Oversized** — larger than 8 KiB (bounded before parsing).
 - **Malformed** — not strict JSON, duplicate object keys, non-finite numbers
-  (`NaN`/`Infinity`), or nesting deep enough to threaten the parser.
+  (`NaN`/`Infinity`), or nesting deeper than the depth bound (rejected before
+  any recursive traversal, so a compact deep document fails closed instead of
+  exhausting the recursion stack).
+- **Unreadable** — a file or stdin that cannot be read, or whose bytes are not
+  valid UTF-8, is reported as an `io_error` with exit code `2`.
 - **Not an object**, **unknown field**, **missing field**, or **wrong type**.
 - **Out of range** — a burn-in radius/interval or over-long string outside its
   bound.
@@ -91,13 +100,19 @@ valid, `1` invalid, `2` usage/IO error.
 python3 tools/config-validator/validate_config.py --canonicalize path/to/config.json
 ```
 
-On an accepted document this prints the canonical form: sorted keys and
-normalized locale-tag casing (e.g. `en-us` → `en-US`). Canonicalization is
-idempotent and order-independent, so any two documents with the same accepted
-content produce byte-identical output. Because the schema admits only enums,
-bounded integers, booleans, and strict-shape locale/zone strings, the output
-cannot contain an endpoint, serial, secret, private path, or device identity —
-and the validator's hygiene scan is additionally run over it.
+On an accepted document this prints the canonical form: sorted keys, normalized
+locale-tag casing (e.g. `en-us` → `en-US`), and normalized time-zone-id casing
+(e.g. `america/new_york` → `America/New_York`). Canonicalization is idempotent
+and order-independent, so any two documents with the same accepted content
+produce byte-identical output. Because the schema admits only enums, bounded
+integers, booleans, and strict-shape locale/zone strings, the output cannot
+contain an endpoint, serial, secret, private path, or device identity — and the
+validator's hygiene scan is additionally run over it.
+
+Zone-id casing is normalized on a best-effort basis (title-casing lower/mixed
+words, preserving all-caps abbreviations such as `UTC` and `GMT+5`) without
+consulting any bundled time-zone database; the runtime resolves the id against
+the platform database.
 
 ## Running the host-only tests
 

@@ -45,12 +45,36 @@ SCHEMA_ID = (
 # never exhaust host resources.
 MAX_DOCUMENT_BYTES = 8192
 
+# Hard upper bound on JSON nesting depth. The contract is only two levels deep
+# (root object -> section object -> scalar), but a compact document can nest
+# far deeper while staying under the byte ceiling. Such input is rejected
+# before any recursive traversal (structural check, hygiene scan), so a
+# maliciously deep document fails closed with a JSON verdict instead of
+# exhausting the interpreter's recursion stack.
+MAX_NESTING_DEPTH = 32
+
 # --- Field formats & value domains -------------------------------------------
 
 SEMVER = r"^[0-9]+\.[0-9]+\.[0-9]+$"
-# BCP-47 locale tag: language, optional script, optional region. Accepted
-# case-insensitively; canonicalized to standard casing on output.
-BCP47_TAG = r"^[A-Za-z]{2,3}(?:-[A-Za-z]{4})?(?:-(?:[A-Za-z]{2}|[0-9]{3}))?$"
+# BCP-47 (RFC 5646) locale tag: a primary language subtag with optional
+# script, region, variant(s), extension(s), and a private-use suffix — so
+# valid tags such as ``de-CH-1996`` (variant) and ``en-US-u-ca-gregory``
+# (extension) are accepted, not just language/script/region. Only ASCII
+# letters, digits, and hyphens are admitted, so a path, separator, or space
+# can never masquerade as a tag. Accepted case-insensitively and canonicalized
+# to standard subtag casing on output. The overall length is additionally
+# bounded (see MAX_LOCALE_TAG_LENGTH), which also keeps the alternations here
+# safe from pathological backtracking.
+BCP47_TAG = (
+    r"^"
+    r"[A-Za-z]{2,3}"                                    # primary language
+    r"(?:-[A-Za-z]{4})?"                               # optional script
+    r"(?:-(?:[A-Za-z]{2}|[0-9]{3}))?"                  # optional region
+    r"(?:-(?:[A-Za-z0-9]{5,8}|[0-9][A-Za-z0-9]{3}))*"  # variant(s)
+    r"(?:-[0-9A-WY-Za-wy-z](?:-[A-Za-z0-9]{2,8})+)*"   # extension(s)
+    r"(?:-[Xx](?:-[A-Za-z0-9]{1,8})+)?"                # private use
+    r"$"
+)
 # IANA-style zone id (Area/Location[/Sublocation]) or the literal UTC. No
 # dots, spaces, or leading slash, so path-traversal and absolute paths cannot
 # masquerade as a zone id. The runtime resolves the id against the platform
@@ -123,8 +147,44 @@ def _enum(values, description):
     return {"kind": "enum", "values": tuple(values), "description": description}
 
 
-def _object(properties, description):
-    return {"kind": "object", "properties": properties, "description": description}
+def _object(properties, description, constraints=None):
+    node = {"kind": "object", "properties": properties, "description": description}
+    if constraints:
+        # Draft-2020-12 conditional subschemas (if/then/else) that encode the
+        # SEMANTIC_RULES the emitted JSON Schema would otherwise only describe
+        # in prose. They are inert to _check_node (which walks properties only);
+        # _check_semantics enforces the same rules for the validator itself.
+        node["constraints"] = constraints
+    return node
+
+
+# Conditional schema fragments mirroring SEMANTIC_RULES, so a standard
+# draft-2020-12 validator rejects the same negatives validate_document does:
+# a 'fixed' policy demands a non-null tag/id and a 'device' policy demands
+# null, and an enabled burn-in shift demands a radius of at least 1.
+_LOCALE_CONSTRAINTS = [
+    {
+        "if": {"properties": {"policy": {"const": "fixed"}}, "required": ["policy"]},
+        "then": {"properties": {"tag": {"type": "string"}}},
+        "else": {"properties": {"tag": {"type": "null"}}},
+    }
+]
+_TIMEZONE_CONSTRAINTS = [
+    {
+        "if": {"properties": {"policy": {"const": "fixed"}}, "required": ["policy"]},
+        "then": {"properties": {"id": {"type": "string"}}},
+        "else": {"properties": {"id": {"type": "null"}}},
+    }
+]
+_BURNIN_CONSTRAINTS = [
+    {
+        "if": {
+            "properties": {"shiftEnabled": {"const": True}},
+            "required": ["shiftEnabled"],
+        },
+        "then": {"properties": {"shiftRadiusPx": {"minimum": 1}}},
+    }
+]
 
 
 # Config contract v1. Every property at every level is required and no unknown
@@ -166,6 +226,7 @@ SPEC = _object(
                 ),
             },
             "Locale selection policy.",
+            constraints=_LOCALE_CONSTRAINTS,
         ),
         "timeZone": _object(
             {
@@ -181,6 +242,7 @@ SPEC = _object(
                 ),
             },
             "Time-zone selection policy.",
+            constraints=_TIMEZONE_CONSTRAINTS,
         ),
         "burnIn": _object(
             {
@@ -199,6 +261,7 @@ SPEC = _object(
                 ),
             },
             "Burn-in mitigation shift settings.",
+            constraints=_BURNIN_CONSTRAINTS,
         ),
         "runtime": _object(
             {
@@ -451,32 +514,75 @@ def validate_document(doc):
 def _canonical_locale_tag(tag):
     """Normalize a validated BCP-47 tag to standard subtag casing.
 
-    Language subtags are lowercased, an optional script subtag is titlecased,
-    and an alphabetic region subtag is uppercased. This makes canonicalization
-    idempotent and order-independent regardless of the input's casing.
+    Following RFC 5646 case conventions and the subtag order the tag pattern
+    admits: the language subtag is lowercased, an optional script subtag is
+    titlecased, an alphabetic region subtag is uppercased, and every remaining
+    subtag (variants, extensions, private use) is lowercased. This makes
+    canonicalization idempotent and order-independent regardless of the input's
+    casing, so any two spellings of one tag collapse to identical bytes.
     """
     parts = tag.split("-")
     out = [parts[0].lower()]
-    for part in parts[1:]:
-        if len(part) == 4 and part.isalpha():
-            out.append(part[:1].upper() + part[1:].lower())
-        elif part.isalpha():
-            out.append(part.upper())
-        else:
-            out.append(part)
+    i = 1
+    n = len(parts)
+    # Optional script subtag: exactly four letters -> Titlecase.
+    if i < n and len(parts[i]) == 4 and parts[i].isalpha():
+        out.append(parts[i][:1].upper() + parts[i][1:].lower())
+        i += 1
+    # Optional region subtag: two letters -> UPPER, three digits -> unchanged.
+    if i < n and len(parts[i]) == 2 and parts[i].isalpha():
+        out.append(parts[i].upper())
+        i += 1
+    elif i < n and len(parts[i]) == 3 and parts[i].isdigit():
+        out.append(parts[i])
+        i += 1
+    # Variants, extensions, and private use are all lowercase in canonical form.
+    while i < n:
+        out.append(parts[i].lower())
+        i += 1
     return "-".join(out)
+
+
+def _canonical_zone_id(zone_id):
+    """Normalize a validated IANA-style zone id to canonical subtag casing.
+
+    Each ``/``-separated segment is title-cased word-by-word (words are split
+    on ``_`` / ``-``): a word carrying any lowercase letter is upper-cased on
+    its first letter and lowercased elsewhere, so ``america/new_york`` and
+    ``America/New_York`` collapse to one canonical value. A word with no
+    lowercase letter (an all-caps abbreviation such as ``UTC`` or ``GMT+5``) is
+    left byte-for-byte, since such tokens carry their own fixed casing that no
+    title-casing rule could recover. Canonicalization consults no time-zone
+    database, so an irregularly cased id (e.g. a lowercase French connector or
+    an all-uppercase input) may not round-trip to its exact IANA spelling; the
+    runtime resolves the id against the platform database.
+    """
+    segments = []
+    for segment in zone_id.split("/"):
+        words = re.split(r"([_-])", segment)  # keep the delimiters
+        normalized = []
+        for word in words:
+            if word in ("_", "-") or not any(ch.islower() for ch in word):
+                normalized.append(word)
+            else:
+                normalized.append(word[:1].upper() + word[1:].lower())
+        segments.append("".join(normalized))
+    return "/".join(segments)
 
 
 def canonicalize_document(doc):
     """Return the deterministic canonical form of a validated document.
 
-    The only value normalization is locale-tag casing; every other accepted
-    value is already canonical. Key ordering is imposed at serialization time
-    (``sort_keys``), so the output is a pure function of the accepted content.
+    The only value normalizations are locale-tag and time-zone-id casing;
+    every other accepted value is already canonical. Key ordering is imposed at
+    serialization time (``sort_keys``), so the output is a pure function of the
+    accepted content.
     """
     canonical = json.loads(json.dumps(doc))  # deep copy without shared refs
     if canonical["locale"]["tag"] is not None:
         canonical["locale"]["tag"] = _canonical_locale_tag(canonical["locale"]["tag"])
+    if canonical["timeZone"]["id"] is not None:
+        canonical["timeZone"]["id"] = _canonical_zone_id(canonical["timeZone"]["id"])
     return canonical
 
 
@@ -502,11 +608,41 @@ def _reject_constant(name):
     raise ValueError("non-finite number %r is not allowed" % name)
 
 
+def _exceeds_max_depth(text):
+    """Return True if the raw text nests brackets deeper than the bound.
+
+    Scans the text once without recursion, ignoring braces/brackets that occur
+    inside JSON strings, so it can reject a pathologically deep document before
+    it is parsed or recursively traversed.
+    """
+    depth = 0
+    in_string = False
+    escaped = False
+    for ch in text:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+        elif ch == '"':
+            in_string = True
+        elif ch == "{" or ch == "[":
+            depth += 1
+            if depth > MAX_NESTING_DEPTH:
+                return True
+        elif ch == "}" or ch == "]":
+            depth -= 1
+    return False
+
+
 def parse_config(text):
     """Parse config text. Returns (document, errors).
 
-    Fails closed on oversized input, malformed JSON, duplicate keys, and
-    non-finite numbers (NaN / Infinity) before any document is produced.
+    Fails closed on oversized input, excessively nested input, malformed JSON,
+    duplicate keys, and non-finite numbers (NaN / Infinity) before any document
+    is produced.
     """
     if len(text.encode("utf-8")) > MAX_DOCUMENT_BYTES:
         return None, [
@@ -514,6 +650,14 @@ def parse_config(text):
                 "oversized",
                 "$",
                 "document exceeds %d byte limit" % MAX_DOCUMENT_BYTES,
+            )
+        ]
+    if _exceeds_max_depth(text):
+        return None, [
+            _error(
+                "json_invalid",
+                "$",
+                "input nests deeper than %d levels" % MAX_NESTING_DEPTH,
             )
         ]
     try:
@@ -559,7 +703,7 @@ def _node_to_json_schema(spec):
             "description": spec["description"],
         }
     if kind == "object":
-        return {
+        out = {
             "type": "object",
             "properties": {
                 name: _node_to_json_schema(node)
@@ -569,6 +713,9 @@ def _node_to_json_schema(spec):
             "additionalProperties": False,
             "description": spec["description"],
         }
+        if spec.get("constraints"):
+            out["allOf"] = spec["constraints"]
+        return out
     raise AssertionError("unhandled spec kind: %r" % kind)
 
 
@@ -582,6 +729,7 @@ def emit_schema():
             "x-contract": {
                 "supported_schema_versions": list(SUPPORTED_SCHEMA_VERSIONS),
                 "max_document_bytes": MAX_DOCUMENT_BYTES,
+                "max_nesting_depth": MAX_NESTING_DEPTH,
                 "semantic_rules": list(SEMANTIC_RULES),
                 "hygiene_categories": list(HYGIENE_CATEGORIES),
                 "error_codes": list(ERROR_CODES),
@@ -656,6 +804,17 @@ def main(argv):
             build_report(
                 input_name,
                 [_error("io_error", "$", "cannot read input: %s" % exc.strerror)],
+            )
+        )
+        return 2
+    except UnicodeDecodeError:
+        # Invalid UTF-8 in a file or on stdin is an input problem, not a
+        # contract violation: report the documented io_error verdict rather
+        # than letting the decode error escape as an uncaught traceback.
+        _print_report(
+            build_report(
+                input_name,
+                [_error("io_error", "$", "input is not valid UTF-8")],
             )
         )
         return 2

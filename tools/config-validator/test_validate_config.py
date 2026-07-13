@@ -155,6 +155,16 @@ class StructuralTests(unittest.TestCase):
             error_codes(errors),
         )
 
+    def test_deeply_nested_object_fails_closed(self):
+        # A compact object nested past the interpreter's recursion limit can
+        # stay under the byte ceiling. It must be rejected with a JSON verdict
+        # before any recursive traversal (hygiene scan) can raise RecursionError.
+        depth = 1000
+        text = '{"a":' * depth + "1" + "}" * depth
+        self.assertLessEqual(len(text.encode("utf-8")), vc.MAX_DOCUMENT_BYTES)
+        errors = validate_text(text)
+        self.assertEqual(error_codes(errors), ["json_invalid"])
+
     def test_oversized_document_rejected(self):
         base = valid_doc("device-defaults.json")
         # A huge, otherwise-ignored... there are no free-text fields, so pad the
@@ -254,6 +264,21 @@ class RangeAndFormatTests(unittest.TestCase):
 
     def test_locale_tag_accepts_valid_shapes(self):
         for good in ("en", "en-US", "fr", "es-419", "zh-Hant-TW"):
+            doc = valid_doc()
+            doc["locale"]["policy"] = "fixed"
+            doc["locale"]["tag"] = good
+            self.assertEqual(vc.validate_document(doc), [], good)
+
+    def test_locale_tag_accepts_variants_and_extensions(self):
+        # BCP-47 tags with variants and extensions are valid and must be
+        # accepted, not just language/script/region shapes.
+        for good in (
+            "de-CH-1996",          # variant
+            "sl-rozaj",            # variant
+            "en-US-u-ca-gregory",  # unicode extension
+            "de-DE-u-co-phonebk",  # unicode extension
+            "en-Latn-US-x-priv",   # script + region + private use
+        ):
             doc = valid_doc()
             doc["locale"]["policy"] = "fixed"
             doc["locale"]["tag"] = good
@@ -402,6 +427,30 @@ class CanonicalTests(unittest.TestCase):
             json.loads(vc.canonical_text(doc))["locale"]["tag"], "zh-Hant-TW"
         )
 
+    def test_canonical_form_normalizes_timezone_casing(self):
+        # Any letter casing of one zone must produce a single canonical value,
+        # so canonical output is a stable identity / deduplication key.
+        outs = set()
+        for zone in (
+            "America/New_York",
+            "america/new_york",
+            "America/new_york",
+            "america/New_York",
+        ):
+            doc = valid_doc()
+            doc["timeZone"]["policy"] = "fixed"
+            doc["timeZone"]["id"] = zone
+            outs.add(json.loads(vc.canonical_text(doc))["timeZone"]["id"])
+        self.assertEqual(outs, {"America/New_York"})
+
+    def test_canonical_zone_preserves_abbreviations(self):
+        # All-caps abbreviations carry fixed casing no rule could recover, so
+        # they are preserved verbatim (and canonicalization stays idempotent).
+        for zone in ("UTC", "Etc/GMT+5", "Europe/Berlin"):
+            once = vc._canonical_zone_id(zone)
+            self.assertEqual(once, zone)
+            self.assertEqual(vc._canonical_zone_id(once), once)
+
     def test_canonical_form_has_sorted_keys(self):
         doc = valid_doc()
         text = vc.canonical_text(doc)
@@ -476,6 +525,45 @@ class CliTests(unittest.TestCase):
         report = json.loads(proc.stdout)
         self.assertEqual(error_codes(report["errors"]), ["io_error"])
 
+    def test_invalid_utf8_file_exits_two(self):
+        # A file whose bytes are not valid UTF-8 is an io_error with exit 2 and
+        # a machine-readable verdict — never an uncaught UnicodeDecodeError.
+        import tempfile
+
+        fd, path = tempfile.mkstemp(suffix=".json")
+        try:
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(b'{"schemaVersion": "\xff\xfe1.0.0"}')
+            proc = self.run_cli(path)
+        finally:
+            os.remove(path)
+        self.assertEqual(proc.returncode, 2)
+        self.assertNotIn("Traceback", proc.stderr)
+        report = json.loads(proc.stdout)
+        self.assertEqual(error_codes(report["errors"]), ["io_error"])
+
+    def test_invalid_utf8_stdin_exits_two(self):
+        env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
+        proc = subprocess.run(
+            [sys.executable, VALIDATOR, "-"],
+            input=b"\xff\xfe\xfa",
+            capture_output=True,
+            env=env,
+        )
+        self.assertEqual(proc.returncode, 2)
+        self.assertNotIn(b"Traceback", proc.stderr)
+        report = json.loads(proc.stdout.decode("utf-8"))
+        self.assertEqual(error_codes(report["errors"]), ["io_error"])
+
+    def test_deeply_nested_object_cli_fails_closed(self):
+        # The CLI must fail closed on a deep object with exit 1 and no traceback.
+        depth = 1000
+        text = '{"a":' * depth + "1" + "}" * depth
+        proc = self.run_cli("-", stdin=text)
+        self.assertEqual(proc.returncode, 1)
+        self.assertNotIn("Traceback", proc.stderr)
+        self.assertFalse(json.loads(proc.stdout)["valid"])
+
     def test_usage_error_exits_two(self):
         proc = self.run_cli("--bogus")
         self.assertEqual(proc.returncode, 2)
@@ -535,6 +623,28 @@ class SchemaFileTests(unittest.TestCase):
         errors = []
         vc._check_hygiene(doc, errors)
         self.assertEqual(errors, [])
+
+    def test_schema_encodes_semantic_conditions(self):
+        # The semantic rules must be enforceable draft-2020-12 conditions, not
+        # only descriptive x-contract prose, so a standard schema validator
+        # rejects the same negatives validate_document does.
+        with open(SCHEMA_FILE, "r", encoding="utf-8") as fh:
+            schema = json.load(fh)
+        props = schema["properties"]
+
+        locale = props["locale"]["allOf"][0]
+        self.assertEqual(locale["if"]["properties"]["policy"]["const"], "fixed")
+        self.assertEqual(locale["then"]["properties"]["tag"]["type"], "string")
+        self.assertEqual(locale["else"]["properties"]["tag"]["type"], "null")
+
+        zone = props["timeZone"]["allOf"][0]
+        self.assertEqual(zone["if"]["properties"]["policy"]["const"], "fixed")
+        self.assertEqual(zone["then"]["properties"]["id"]["type"], "string")
+        self.assertEqual(zone["else"]["properties"]["id"]["type"], "null")
+
+        burn = props["burnIn"]["allOf"][0]
+        self.assertEqual(burn["if"]["properties"]["shiftEnabled"]["const"], True)
+        self.assertEqual(burn["then"]["properties"]["shiftRadiusPx"]["minimum"], 1)
 
 
 if __name__ == "__main__":
