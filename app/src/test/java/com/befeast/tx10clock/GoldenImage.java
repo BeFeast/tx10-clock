@@ -8,6 +8,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Locale;
 
 /**
  * Small golden-image toolkit shared by the offscreen render tests.
@@ -114,5 +115,69 @@ final class GoldenImage {
         final Bitmap diffImage = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         diffImage.setPixels(diff, 0, w, 0, 0, w, h);
         return new Diff(mismatched, a.length, maxDelta, diffImage);
+    }
+
+    /**
+     * Assert that {@code actual} matches the committed golden at
+     * {@code resourcePath} (a classpath path such as
+     * {@code /golden/clock_1280x720.png}) within the accepted CI tolerance.
+     *
+     * <p>This is the shared golden-comparison workflow used by the offscreen
+     * render tests, so every declared scenario (default frame, a representative
+     * config change, and each burn-in extreme) checks and reports identically:
+     *
+     * <ul>
+     *   <li>When the golden is absent, or {@code -Dgolden.record=true} is set,
+     *       the freshly rendered frame is written under the golden resource
+     *       directory and the assertion fails asking for a re-run — the same
+     *       record-then-commit flow the default golden uses.</li>
+     *   <li>Otherwise the frame is compared pixel-for-pixel. A mismatch beyond
+     *       {@code maxMismatchFraction} writes {@code <tag>.actual.png},
+     *       {@code <tag>.expected.png}, and {@code <tag>.diff.png} to the golden
+     *       output directory (the artifacts CI uploads) and fails. The
+     *       {@code tag} keeps multiple scenarios' artifacts from overwriting one
+     *       another.</li>
+     * </ul>
+     */
+    static void assertMatchesGolden(Bitmap actual, String resourcePath, String tag,
+                                    int channelThreshold, double maxMismatchFraction) {
+        Bitmap golden = loadFromClasspath(resourcePath);
+        boolean record = Boolean.parseBoolean(System.getProperty("golden.record", "false"));
+        if (golden == null || record) {
+            File target = new File(recordDir(), baseName(resourcePath));
+            writePng(actual, target);
+            throw new AssertionError(
+                    "Golden generated at " + target + "; rerun without golden.record");
+        }
+        Diff diff = compare(actual, golden, channelThreshold);
+        if (diff.mismatchFraction() > maxMismatchFraction) {
+            File out = outputDir();
+            writePng(actual, new File(out, tag + ".actual.png"));
+            writePng(golden, new File(out, tag + ".expected.png"));
+            writePng(diff.diffImage, new File(out, tag + ".diff.png"));
+            throw new AssertionError(String.format(Locale.US,
+                    "Golden mismatch for %s: %.4f%% (max %.4f%%), artifacts in %s",
+                    tag, diff.mismatchFraction() * 100.0,
+                    maxMismatchFraction * 100.0, out));
+        }
+    }
+
+    /** Directory the failure triage artifacts are written to (CI uploads it). */
+    private static File outputDir() {
+        File dir = new File(System.getProperty("golden.output.dir", "build/golden-output"));
+        //noinspection ResultOfMethodCallIgnored
+        dir.mkdirs();
+        return dir;
+    }
+
+    /** Directory freshly recorded goldens are written to (override via property). */
+    private static File recordDir() {
+        return new File(System.getProperty("golden.record.dir", "src/test/resources/golden"));
+    }
+
+    /** The trailing file name of a {@code /golden/...} classpath resource path. */
+    private static String baseName(String resourcePath) {
+        int slash = resourcePath.lastIndexOf('/');
+        return slash < 0 ? resourcePath : resourcePath.substring(slash + 1);
     }
 }

@@ -2,7 +2,6 @@ package com.befeast.tx10clock;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -14,10 +13,8 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.GraphicsMode;
 
-import java.io.File;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
-import java.util.Locale;
 
 /** Deterministic 1280x720 visual-contract checks. */
 @RunWith(RobolectricTestRunner.class)
@@ -58,26 +55,8 @@ public class ClockRendererRenderTest {
 
     @Test
     public void offscreenFrameMatchesGolden() {
-        Bitmap actual = renderFixedFrame();
-        Bitmap golden = GoldenImage.loadFromClasspath(GOLDEN_RESOURCE);
-        boolean record = Boolean.parseBoolean(System.getProperty("golden.record", "false"));
-        if (golden == null || record) {
-            File target = new File(recordDir(), "clock_1280x720.png");
-            GoldenImage.writePng(actual, target);
-            fail("Golden image generated at " + target + "; rerun without golden.record");
-        }
-
-        GoldenImage.Diff diff = GoldenImage.compare(actual, golden, CHANNEL_THRESHOLD);
-        if (diff.mismatchFraction() > MAX_MISMATCH_FRACTION) {
-            File out = outputDir();
-            GoldenImage.writePng(actual, new File(out, "actual.png"));
-            GoldenImage.writePng(golden, new File(out, "expected.png"));
-            GoldenImage.writePng(diff.diffImage, new File(out, "diff.png"));
-            fail(String.format(Locale.US,
-                    "Golden mismatch %.4f%% (max %.4f%%), artifacts: %s",
-                    diff.mismatchFraction() * 100.0,
-                    MAX_MISMATCH_FRACTION * 100.0, out));
-        }
+        GoldenImage.assertMatchesGolden(renderFixedFrame(), GOLDEN_RESOURCE,
+                "clock_1280x720", CHANNEL_THRESHOLD, MAX_MISMATCH_FRACTION);
     }
 
     private static int countNonBlack(Bitmap bitmap, int left, int top, int right, int bottom) {
@@ -108,16 +87,5 @@ public class ClockRendererRenderTest {
             }
         }
         return count;
-    }
-
-    private static File outputDir() {
-        File dir = new File(System.getProperty("golden.output.dir", "build/golden-output"));
-        //noinspection ResultOfMethodCallIgnored
-        dir.mkdirs();
-        return dir;
-    }
-
-    private static File recordDir() {
-        return new File(System.getProperty("golden.record.dir", "src/test/resources/golden"));
     }
 }
