@@ -95,16 +95,26 @@ def _no_duplicate_keys(pairs):
 
 def _reject_nonfinite(value, pointer: str = "") -> None:
     # Overflowing numeric literals (e.g. 1e400) parse to float('inf') without
-    # going through parse_constant, so walk the tree and reject any non-finite
-    # float wherever it appears.
-    if isinstance(value, float) and not math.isfinite(value):
-        raise ConfigValidationError("non-finite number is not allowed", pointer)
-    if isinstance(value, dict):
-        for key, sub in value.items():
-            _reject_nonfinite(sub, f"{pointer}/{key}")
-    elif isinstance(value, list):
-        for index, sub in enumerate(value):
-            _reject_nonfinite(sub, f"{pointer}/{index}")
+    # going through parse_constant. Use an explicit stack so an otherwise
+    # byte-bounded but deeply nested document cannot exhaust Python recursion
+    # before the schema rejects its unsupported shape.
+    pending = [(value, pointer)]
+    while pending:
+        current, current_pointer = pending.pop()
+        if isinstance(current, float) and not math.isfinite(current):
+            raise ConfigValidationError(
+                "non-finite number is not allowed", current_pointer
+            )
+        if isinstance(current, dict):
+            pending.extend(
+                (sub, f"{current_pointer}/{key}")
+                for key, sub in current.items()
+            )
+        elif isinstance(current, list):
+            pending.extend(
+                (sub, f"{current_pointer}/{index}")
+                for index, sub in enumerate(current)
+            )
 
 
 def _parse(raw: bytes):
@@ -124,6 +134,10 @@ def _parse(raw: bytes):
         )
     except ConfigValidationError:
         raise
+    except RecursionError as exc:
+        raise ConfigValidationError(
+            "input nesting exceeds the supported depth"
+        ) from exc
     except json.JSONDecodeError as exc:
         raise ConfigValidationError(f"input is not valid JSON: {exc}") from exc
     _reject_nonfinite(parsed)

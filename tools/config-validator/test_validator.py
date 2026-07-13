@@ -182,6 +182,32 @@ class BoundaryChecks(unittest.TestCase):
         with self.assertRaises(validator.ConfigValidationError):
             validator.validate(oversized)
 
+    def test_deeply_nested_json_fails_closed_without_traceback(self):
+        deeply_nested = b"[" * 2000 + b"0" + b"]" * 2000
+        self.assertLess(len(deeply_nested), validator.MAX_DOCUMENT_BYTES)
+
+        with self.assertRaises(validator.ConfigValidationError):
+            validator.validate(deeply_nested)
+
+        result = subprocess.run(
+            [sys.executable, str(MODULE), "-"],
+            input=deeply_nested,
+            capture_output=True,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, b"")
+        self.assertNotIn(b"Traceback", result.stderr)
+        self.assertNotIn(b"/home/", result.stderr)
+
+    def test_nonfinite_walk_is_iterative(self):
+        deeply_nested = 0
+        for _ in range(2000):
+            deeply_nested = [deeply_nested]
+
+        # This shape is invalid at the schema boundary, but the pre-validation
+        # pass must inspect it without consuming the Python call stack.
+        validator._reject_nonfinite(deeply_nested)
+
     def test_document_at_limit_is_accepted(self):
         core = b'{"schemaVersion": 1}'
         padding = b" " * (validator.MAX_DOCUMENT_BYTES - len(core))
