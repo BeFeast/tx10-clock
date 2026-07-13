@@ -51,10 +51,21 @@ only and encode no visual decisions.
 
 ## Requirements
 
+The build inputs are pinned for a reproducible release (single source of truth:
+[`release/toolchain.lock.json`](release/toolchain.lock.json); see also
+[`docs/releasing.md`](docs/releasing.md)):
+
 - JDK 17
-- Android SDK with `platforms;android-29` and `build-tools;29.0.3`
-  (point Gradle at it via `ANDROID_SDK_ROOT` or a `local.properties`
-  `sdk.dir=` line — `local.properties` is intentionally untracked).
+- Android Gradle Plugin 9.2.1 with its tested Gradle 9.4.1 (both pinned in the
+  build files; the Gradle wrapper additionally verifies the distribution
+  SHA-256).
+- Android SDK with `platforms;android-29` and `build-tools;36.0.0`, installed
+  with Command-line Tools build `14742923` (point Gradle at the SDK via
+  `ANDROID_SDK_ROOT` or a `local.properties` `sdk.dir=` line —
+  `local.properties` is intentionally untracked).
+- Strict dependency locking in [`app/gradle.lockfile`](app/gradle.lockfile) and
+  SHA-256 dependency verification in
+  [`gradle/verification-metadata.xml`](gradle/verification-metadata.xml).
 
 ## Build & test
 
@@ -71,11 +82,15 @@ The strict-ingestion, last-known-good, reload, atomic-replacement, and
 scripts/run-config-jvm-tests.sh   # compiles + runs the config-core tests only
 ```
 
-The scaffold's `assembleRelease` output is unsigned. CI may retain it under the
-explicit name `tx10-clock-unsigned-ci-verification-apk` for manifest and package
-inspection only; it is not installable and must not be attached to a GitHub
-Release. Release signing and the installable APK are delivered by issue
-[#5](https://github.com/BeFeast/tx10-clock/issues/5).
+The `assembleRelease` output of a local/CI build is unsigned. CI may retain it
+under the explicit name `tx10-clock-unsigned-ci-verification-apk` for manifest
+and package inspection only; it is not installable and must not be attached to a
+GitHub Release. The signed, installable APK is produced only by the pinned,
+operator-gated release workflow
+([`.github/workflows/release.yml`](.github/workflows/release.yml)); the full
+tag → build → sign → verify → publish process, the reproducibility double-build,
+and how to independently inspect a published asset are documented in
+[`docs/releasing.md`](docs/releasing.md).
 
 The unit suite includes a **deterministic offscreen golden harness**
 ([`ClockRendererRenderTest`](app/src/test/java/com/befeast/tx10clock/ClockRendererRenderTest.java)):

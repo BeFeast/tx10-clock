@@ -1,0 +1,233 @@
+name: Release
+
+# Signed release delivery for a reviewed v-tag. This workflow is the pinned,
+# operator-gated automation that turns the exact reviewed commit into a signed,
+# evidence-backed GitHub Release. It never runs on a branch push and never
+# manufactures SDK-licence or signing authority:
+#
+#   * It fires only for a pushed SemVer tag (or a deliberate manual dispatch),
+#     so publishing is an operator action — pushing the tag.
+#   * Every job is gated on the recorded operator SDK-licence acceptance, the
+#     same human gate CI uses; a pending decision cannot trigger a build.
+#   * Signing key material and passwords resolve at runtime from the private
+#     Infisical/Vaultwarden stores only, are masked, and never touch git, the
+#     workspace, or the logs.
+#
+# Every third-party action is pinned to a full commit SHA (acceptance: release
+# inputs are pinned). See docs/releasing.md for the end-to-end runbook.
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing v-tag to (re)build and publish, e.g. v0.1.0'
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # Pinned release inputs (single source of truth: release/toolchain.lock.json).
+  ANDROID_PLATFORM: '29'
+  ANDROID_BUILD_TOOLS: '36.0.0'
+  ANDROID_CMDLINE_TOOLS_BUILD: '14742923'
+  INFISICAL_CLI_VERSION: '0.43.96'
+  INFISICAL_CLI_LINUX_AMD64_SHA256: 'c89ac2b013f0f0219e8ab390a47266ef86da4fe43a2d0ae72e1acc9f66da9de4'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # The same human gate CI uses. Merging or tagging never manufactures legal
+  # acceptance; the build jobs below stay skipped until it is recorded.
+  license-gate:
+    name: Android SDK license acceptance gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report pending operator acceptance
+        if: ${{ vars.ANDROID_SDK_LICENSE_ACCEPTED != 'true' }}
+        run: echo "::notice::Release build stays disabled until operator SDK-licence acceptance is recorded."
+      - name: Confirm recorded operator acceptance
+        if: ${{ vars.ANDROID_SDK_LICENSE_ACCEPTED == 'true' }}
+        run: echo "Recorded Android SDK license gate is open."
+
+  # ---------------------------------------------------------------------------
+  # Build the artifact twice in two independent clean environments and run the
+  # full documented outcome gates in each. The two digests feed the byte
+  # reproducibility comparison in the publish job.
+  reproducible-build:
+    name: Clean build & verify (${{ matrix.env_id }})
+    needs: license-gate
+    if: ${{ vars.ANDROID_SDK_LICENSE_ACCEPTED == 'true' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        env_id: [clean-a, clean-b]
+    steps:
+      - name: Checkout the exact tagged commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK (platform 29, build-tools 36.0.0)
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+        with:
+          # Licence acceptance is a human gate, not a CI side effect. The
+          # operator-gated runner image must already provide accepted licences.
+          accept-android-sdk-licenses: false
+          cmdline-tools-version: ${{ env.ANDROID_CMDLINE_TOOLS_BUILD }}
+          packages: 'platform-tools platforms;android-${{ env.ANDROID_PLATFORM }} build-tools;${{ env.ANDROID_BUILD_TOOLS }}'
+
+      - name: Enforce pinned release inputs
+        run: bash scripts/check-release-pins.sh
+
+      - name: Run documented outcome gates (build, static/unit, golden verifier)
+        run: bash scripts/verify-outcome.sh
+
+      - name: Record artifact digest for reproducibility comparison
+        id: digest
+        run: |
+          apk="app/build/outputs/apk/release/app-release-unsigned.apk"
+          test -f "$apk" || { echo "unsigned APK missing"; exit 1; }
+          sha="$(sha256sum "$apk" | cut -d' ' -f1)"
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          echo "::notice::${{ matrix.env_id }} unsigned APK sha256=$sha"
+
+      - name: Upload unsigned APK for the publish job
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: unsigned-${{ matrix.env_id }}
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Compare the two builds, align + sign, verify the signer, assemble and
+  # validate the release evidence, then publish the SemVer GitHub Release.
+  sign-and-publish:
+    name: Sign, verify, and publish
+    needs: reproducible-build
+    if: ${{ vars.ANDROID_SDK_LICENSE_ACCEPTED == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the GitHub Release and upload assets
+    steps:
+      - name: Checkout the exact tagged commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK (build-tools 36.0.0 for apksigner/zipalign)
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+        with:
+          accept-android-sdk-licenses: false
+          cmdline-tools-version: ${{ env.ANDROID_CMDLINE_TOOLS_BUILD }}
+          packages: 'platforms;android-${{ env.ANDROID_PLATFORM }} build-tools;${{ env.ANDROID_BUILD_TOOLS }}'
+
+      - name: Download build A
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: unsigned-clean-a
+          path: build-a
+
+      - name: Download build B
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: unsigned-clean-b
+          path: build-b
+
+      - name: Compare the two clean builds (byte reproducibility)
+        id: repro
+        run: |
+          a="$(sha256sum build-a/app-release-unsigned.apk | cut -d' ' -f1)"
+          b="$(sha256sum build-b/app-release-unsigned.apk | cut -d' ' -f1)"
+          echo "sha_a=$a" >> "$GITHUB_OUTPUT"
+          echo "sha_b=$b" >> "$GITHUB_OUTPUT"
+          if [ "$a" = "$b" ]; then
+            echo "byte_identical=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Byte-reproducible: both clean builds are $a"
+          else
+            echo "byte_identical=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Builds are not byte-identical (a=$a b=$b); reproducibility will be recorded as not-claimed."
+          fi
+
+      - name: Install the pinned Infisical CLI
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/infisical.tar.gz"
+          curl --fail --location --silent --show-error \
+            "https://github.com/Infisical/cli/releases/download/v${INFISICAL_CLI_VERSION}/cli_${INFISICAL_CLI_VERSION}_linux_amd64.tar.gz" \
+            --output "$archive"
+          printf '%s  %s\n' "$INFISICAL_CLI_LINUX_AMD64_SHA256" "$archive" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/infisical-bin"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/infisical-bin" infisical
+          chmod 0755 "$RUNNER_TEMP/infisical-bin/infisical"
+          echo "$RUNNER_TEMP/infisical-bin" >> "$GITHUB_PATH"
+
+      - name: Resolve signing material from the private stores (masked)
+        env:
+          # The ONLY release secrets held by GitHub are the machine-identity
+          # credentials that let the runner read the private stores. The actual
+          # keystore and passwords live in Infisical/Vaultwarden and are pulled
+          # here into masked env, written only to $RUNNER_TEMP, never to git.
+          INFISICAL_UNIVERSAL_AUTH_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
+          INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          INFISICAL_API_URL: ${{ vars.INFISICAL_API_URL }}
+          INFISICAL_PROJECT: ${{ vars.INFISICAL_PROJECT }}
+          SIGNING_KEY_REFERENCE: ${{ vars.RELEASE_SIGNING_KEY_REFERENCE }}
+        run: bash scripts/release-resolve-signing.sh
+
+      - name: Align, sign, and verify the signer (apksigner -Werr)
+        env:
+          EXPECTED_CERT_SHA256: ${{ vars.RELEASE_SIGNING_CERT_SHA256 }}
+        run: bash scripts/release-sign-and-verify.sh build-a/app-release-unsigned.apk
+
+      - name: Assemble and validate release evidence
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          SOURCE_COMMIT: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA_A: ${{ steps.repro.outputs.sha_a }}
+          SHA_B: ${{ steps.repro.outputs.sha_b }}
+          BYTE_IDENTICAL: ${{ steps.repro.outputs.byte_identical }}
+          SIGNING_KEY_REFERENCE: ${{ vars.RELEASE_SIGNING_KEY_REFERENCE }}
+        run: bash scripts/release-emit-evidence.sh
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          apk="$(cat release-out/apk-name.txt)"
+          gh release create "$RELEASE_TAG" \
+            --repo "${{ github.repository }}" \
+            --title "TX10 Clock $RELEASE_TAG" \
+            --notes-file release-out/RELEASE_NOTES.md \
+            --verify-tag \
+            "release-out/$apk" \
+            "release-out/release-evidence.json" \
+            "release-out/SHA256SUMS"

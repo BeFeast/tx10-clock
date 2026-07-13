@@ -1,0 +1,401 @@
+{
+  "$id": "https://github.com/BeFeast/tx10-clock/blob/main/release/evidence/schema/evidence-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Deterministic, public-safe provenance record for one tx10-clock release.",
+  "properties": {
+    "artifact": {
+      "additionalProperties": false,
+      "description": "The signed release artifact and its digest.",
+      "properties": {
+        "filename": {
+          "description": "Bare artifact filename (no directory separators).",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}\\.apk$",
+          "type": "string"
+        },
+        "sha256": {
+          "description": "SHA-256 digest of the signed artifact, 64 lowercase hex.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "size_bytes": {
+          "description": "Artifact size in bytes.",
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "filename",
+        "sha256",
+        "size_bytes"
+      ],
+      "type": "object"
+    },
+    "ci": {
+      "additionalProperties": false,
+      "description": "The CI run that produced and published the release.",
+      "properties": {
+        "provider": {
+          "description": "CI provider slug.",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,31}$",
+          "type": "string"
+        },
+        "run_url": {
+          "description": "Public URL of the CI run.",
+          "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/actions/runs/[0-9]{1,32}$",
+          "type": "string"
+        },
+        "workflow": {
+          "description": "Workflow file that produced the release.",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\.ya?ml$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "run_url",
+        "workflow"
+      ],
+      "type": "object"
+    },
+    "evidence_id": {
+      "description": "Stable lowercase slug identifying this evidence record.",
+      "pattern": "^[a-z0-9][a-z0-9-]{7,63}$",
+      "type": "string"
+    },
+    "native_libraries": {
+      "additionalProperties": false,
+      "description": "Proven absence of native libraries in the artifact.",
+      "properties": {
+        "entries": {
+          "description": "Native-library entries found (must be empty).",
+          "items": {
+            "description": "One native-library archive entry.",
+            "pattern": "^[!-~][ -~]{0,255}$",
+            "type": "string"
+          },
+          "minItems": 0,
+          "type": "array"
+        },
+        "present": {
+          "description": "Whether the artifact contains native libraries (must be false).",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "entries",
+        "present"
+      ],
+      "type": "object"
+    },
+    "package": {
+      "additionalProperties": false,
+      "description": "Package/version identity carried by the artifact.",
+      "properties": {
+        "application_id": {
+          "description": "Android application id of the package.",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$",
+          "type": "string"
+        },
+        "version_code": {
+          "description": "Package versionCode.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "version_name": {
+          "description": "Package versionName (MAJOR.MINOR.PATCH).",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "application_id",
+        "version_code",
+        "version_name"
+      ],
+      "type": "object"
+    },
+    "reproducibility": {
+      "additionalProperties": false,
+      "description": "Reproducibility double-build comparison.",
+      "properties": {
+        "builds": {
+          "description": "Independent clean-environment builds (at least two).",
+          "items": {
+            "additionalProperties": false,
+            "description": "One independent clean-environment build.",
+            "properties": {
+              "artifact_sha256": {
+                "description": "SHA-256 of this environment's built artifact.",
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "environment": {
+                "description": "Identifier of the clean build environment.",
+                "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "artifact_sha256",
+              "environment"
+            ],
+            "type": "object"
+          },
+          "minItems": 2,
+          "type": "array"
+        },
+        "byte_identical": {
+          "description": "The compared builds were byte-for-byte identical.",
+          "type": "boolean"
+        },
+        "compared": {
+          "description": "Two independent clean-environment builds were compared.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "builds",
+        "byte_identical",
+        "compared"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "description": "Release-evidence contract version this document claims.",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "type": "string"
+    },
+    "sdk_packages": {
+      "description": "Resolved SDK packages with revisions and digests.",
+      "items": {
+        "additionalProperties": false,
+        "description": "One resolved SDK package with its revision and digest.",
+        "properties": {
+          "path": {
+            "description": "sdkmanager package path, e.g. 'platforms;android-29'.",
+            "pattern": "^[a-z][a-z0-9-]*(?:;[A-Za-z0-9][A-Za-z0-9._-]*)+$",
+            "type": "string"
+          },
+          "revision": {
+            "description": "Resolved package revision.",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+            "type": "string"
+          },
+          "sha256": {
+            "description": "Resolved package archive digest.",
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "revision",
+          "sha256"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "signing": {
+      "additionalProperties": false,
+      "description": "Signing certificate reference and verification result.",
+      "properties": {
+        "apksigner_command": {
+          "description": "The exact apksigner verification command that was run.",
+          "pattern": "^[ -~]{1,128}$",
+          "type": "string"
+        },
+        "apksigner_verified": {
+          "description": "apksigner verification of the signed artifact succeeded.",
+          "type": "boolean"
+        },
+        "certificate_sha256_fingerprint": {
+          "description": "Public SHA-256 certificate fingerprint: 32 colon-separated uppercase hex pairs. Never key material.",
+          "pattern": "^(?:[0-9A-F]{2}:){31}[0-9A-F]{2}$",
+          "type": "string"
+        },
+        "key_reference": {
+          "description": "Private-store reference to the signing key (infisical://\u2026 or vaultwarden://\u2026). Never key material.",
+          "pattern": "^(?:infisical|vaultwarden)://[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "apksigner_command",
+        "apksigner_verified",
+        "certificate_sha256_fingerprint",
+        "key_reference"
+      ],
+      "type": "object"
+    },
+    "source": {
+      "additionalProperties": false,
+      "description": "Exact public source identity the release was built from.",
+      "properties": {
+        "commit_sha": {
+          "description": "Exact 40-hex reviewed commit the tag and artifact resolve to.",
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "release_tag": {
+          "description": "SemVer release tag (vMAJOR.MINOR.PATCH).",
+          "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "type": "string"
+        },
+        "repository": {
+          "description": "GitHub owner/name the release was built from.",
+          "pattern": "^[A-Za-z0-9_.-]{1,64}/[A-Za-z0-9_.-]{1,64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "commit_sha",
+        "release_tag",
+        "repository"
+      ],
+      "type": "object"
+    },
+    "toolchain": {
+      "additionalProperties": false,
+      "description": "The pinned, non-dynamic build inputs.",
+      "properties": {
+        "actions_fully_sha_pinned": {
+          "description": "Every GitHub Action used was pinned to a full commit SHA.",
+          "type": "boolean"
+        },
+        "allows_dynamic_versions": {
+          "description": "Whether dynamic version selectors were permitted (must be false).",
+          "type": "boolean"
+        },
+        "allows_snapshot_dependencies": {
+          "description": "Whether SNAPSHOT dependencies were permitted (must be false).",
+          "type": "boolean"
+        },
+        "android_gradle_plugin": {
+          "description": "Pinned Android Gradle Plugin version.",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "type": "string"
+        },
+        "android_platform": {
+          "description": "Pinned Android platform API level.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "build_tools": {
+          "description": "Pinned SDK Build Tools version.",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "type": "string"
+        },
+        "command_line_tools": {
+          "description": "Pinned Command-line Tools build number.",
+          "pattern": "^[0-9]{6,12}$",
+          "type": "string"
+        },
+        "dependency_locking": {
+          "description": "Gradle dependency locking was enforced.",
+          "type": "boolean"
+        },
+        "dependency_verification": {
+          "description": "Gradle dependency verification was enforced.",
+          "type": "boolean"
+        },
+        "gradle": {
+          "description": "Pinned Gradle version.",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "type": "string"
+        },
+        "gradle_distribution_sha256": {
+          "description": "SHA-256 of the pinned Gradle distribution archive.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "jdk_major": {
+          "description": "Pinned JDK major version.",
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "actions_fully_sha_pinned",
+        "allows_dynamic_versions",
+        "allows_snapshot_dependencies",
+        "android_gradle_plugin",
+        "android_platform",
+        "build_tools",
+        "command_line_tools",
+        "dependency_locking",
+        "dependency_verification",
+        "gradle",
+        "gradle_distribution_sha256",
+        "jdk_major"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "artifact",
+    "ci",
+    "evidence_id",
+    "native_libraries",
+    "package",
+    "reproducibility",
+    "schema_version",
+    "sdk_packages",
+    "signing",
+    "source",
+    "toolchain"
+  ],
+  "title": "tx10-clock-release-evidence",
+  "type": "object",
+  "x-contract": {
+    "error_codes": [
+      "format_invalid",
+      "hygiene_violation",
+      "io_error",
+      "json_invalid",
+      "missing_field",
+      "pin_mismatch",
+      "policy_invalid",
+      "schema_version_unsupported",
+      "state_invalid",
+      "type_invalid",
+      "unknown_field",
+      "usage_error"
+    ],
+    "hygiene_categories": [
+      "local_absolute_path",
+      "private_endpoint",
+      "credential_material"
+    ],
+    "pinned_toolchain": {
+      "android_gradle_plugin": "9.2.1",
+      "android_platform": 29,
+      "build_tools": "36.0.0",
+      "command_line_tools": "14742923",
+      "gradle": "9.4.1",
+      "gradle_distribution_sha256": "2ab2958f2a1e51120c326cad6f385153bb11ee93b3c216c5fccebfdfbb7ec6cb",
+      "jdk_major": 17
+    },
+    "required_apksigner_command": "apksigner verify --print-certs -Werr",
+    "required_sdk_packages": [
+      "platforms;android-29",
+      "build-tools;36.0.0",
+      "cmdline-tools;19.0"
+    ],
+    "semantic_rules": [
+      "toolchain.jdk_major, .android_gradle_plugin, .gradle, .gradle_distribution_sha256, .android_platform, .build_tools, and .command_line_tools must equal the pinned release toolchain",
+      "toolchain.dependency_verification and .dependency_locking must be true; .allows_dynamic_versions and .allows_snapshot_dependencies must be false; .actions_fully_sha_pinned must be true",
+      "sdk_packages must include the pinned 'platforms;android-29', 'build-tools;36.0.0', and 'cmdline-tools;19.0' packages, each with a resolved revision and digest",
+      "package.version_name must equal source.release_tag without its leading 'v'",
+      "native_libraries.present must be false and native_libraries.entries empty (the release APK carries no native code)",
+      "signing.apksigner_verified must be true and signing.apksigner_command must be exactly 'apksigner verify --print-certs -Werr'",
+      "reproducibility.builds must record at least two builds; when reproducibility.byte_identical is true, .compared must be true, every unsigned build digest must be equal; artifact.sha256 independently identifies the subsequently signed release APK",
+      "reproducibility.byte_identical must be true whenever .compared is true and all build digests are equal (no unclaimed reproducibility)"
+    ],
+    "supported_schema_versions": [
+      "1.0.0"
+    ]
+  }
+}
