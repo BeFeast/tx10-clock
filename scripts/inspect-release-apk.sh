@@ -61,11 +61,11 @@ ok "no lib/** or *.so entries (matches evidence: native_libraries.present=false)
 AAPT2="$(ls "${ANDROID_SDK_ROOT:-/nonexistent}"/build-tools/36.0.0/aapt2 2>/dev/null || true)"
 if [ -n "$AAPT2" ] && [ -x "$AAPT2" ]; then
     B="$("$AAPT2" dump badging "$APK")"
-    printf '%s\n' "$B" | grep -q "package: name='$EXP_APPID'" \
+    printf '%s\n' "$B" | grep -Fq "package: name='$EXP_APPID'" \
         || die "application id mismatch (want $EXP_APPID)"
-    printf '%s\n' "$B" | grep -q "versionName='$EXP_VNAME'" \
+    printf '%s\n' "$B" | grep -Fq "versionName='$EXP_VNAME'" \
         || die "versionName mismatch (want $EXP_VNAME)"
-    printf '%s\n' "$B" | grep -q "versionCode='$EXP_VCODE'" \
+    printf '%s\n' "$B" | grep -Fq "versionCode='$EXP_VCODE'" \
         || die "versionCode mismatch (want $EXP_VCODE)"
     if printf '%s\n' "$B" | grep -q "native-code:"; then
         die "APK declares native-code"

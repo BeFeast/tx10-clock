@@ -173,6 +173,13 @@ class PinnedToolchainMatchesBuildFiles(unittest.TestCase):
         self.assertIn("-storepass:env RELEASE_KEYSTORE_PASSWORD", signer)
         self.assertNotIn("-storepass \"$RELEASE_KEYSTORE_PASSWORD\"", signer)
 
+    def test_release_inspector_treats_evidence_identity_as_fixed_strings(self):
+        path = os.path.join(ROOT, "scripts", "inspect-release-apk.sh")
+        with open(path, "r", encoding="utf-8") as fh:
+            inspector = fh.read()
+        for field in ("EXP_APPID", "EXP_VNAME", "EXP_VCODE"):
+            self.assertRegex(inspector, r'grep -Fq "[^"\n]*\$%s' % field)
+
 
 class ToolchainSemanticsTests(unittest.TestCase):
     def test_each_pin_mismatch_is_reported(self):
