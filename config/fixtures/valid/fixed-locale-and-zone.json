@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0.0",
+  "clock": {
+    "hourCycle": "h24",
+    "showSeconds": true,
+    "showDate": true,
+    "analogSweep": "smooth"
+  },
+  "locale": {
+    "policy": "fixed",
+    "tag": "en-US"
+  },
+  "timeZone": {
+    "policy": "fixed",
+    "id": "America/New_York"
+  },
+  "burnIn": {
+    "shiftEnabled": false,
+    "shiftRadiusPx": 0,
+    "shiftIntervalSeconds": 300
+  },
+  "runtime": {
+    "bootStart": true,
+    "keepScreenOn": true,
+    "safeRefresh": true
+  }
+}

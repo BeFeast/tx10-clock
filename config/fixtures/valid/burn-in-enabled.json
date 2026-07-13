@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0.0",
+  "clock": {
+    "hourCycle": "h24",
+    "showSeconds": true,
+    "showDate": false,
+    "analogSweep": "smooth"
+  },
+  "locale": {
+    "policy": "device",
+    "tag": null
+  },
+  "timeZone": {
+    "policy": "fixed",
+    "id": "Europe/Berlin"
+  },
+  "burnIn": {
+    "shiftEnabled": true,
+    "shiftRadiusPx": 8,
+    "shiftIntervalSeconds": 60
+  },
+  "runtime": {
+    "bootStart": true,
+    "keepScreenOn": true,
+    "safeRefresh": true
+  }
+}
