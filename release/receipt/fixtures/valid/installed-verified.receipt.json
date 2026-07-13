@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0.0",
+  "receipt_id": "rcpt-2026-0003-installed",
+  "note": "Full lifecycle: delivered, installed, and verified on the target profile.",
+  "source": {
+    "repo": "BeFeast/tx10-clock",
+    "commit": "809f5f915582ce443afd5ee61325825fbbfd68af",
+    "ref": "refs/tags/v1.2.0"
+  },
+  "release": {
+    "tag": "v1.2.0",
+    "name": "TX10 Clock 1.2.0",
+    "path": "releases/tag/v1.2.0"
+  },
+  "asset": {
+    "filename": "tx10-clock-1.2.0.apk",
+    "sha256": "809f5f915582ce443afd5ee61325825fbbfd68af4b7d059b2dab7349dcb17765",
+    "size_bytes": 4218880
+  },
+  "package": {
+    "id": "com.befeast.tx10clock",
+    "version_name": "1.2.0",
+    "version_code": 10200
+  },
+  "signing": {
+    "certificate_fingerprint_sha256": "C4:CE:73:85:63:5E:DD:B0:7B:FF:E5:06:88:2F:B7:D5:65:5D:0F:5C:65:C7:69:70:05:55:61:FD:B3:97:48:2E",
+    "certificate_ref": "release-cert-2026"
+  },
+  "approval": {
+    "approved_by": "release-council",
+    "approved_at": "2026-07-11T12:30:00Z"
+  },
+  "delivery": {
+    "state": "installed",
+    "previous_state": "delivered",
+    "updated_at": "2026-07-12T08:15:00Z"
+  },
+  "verification": {
+    "state": "passed",
+    "method": "sha256-match",
+    "checked_at": "2026-07-12T08:16:00Z"
+  },
+  "rollback": null
+}

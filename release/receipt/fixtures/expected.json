@@ -1,0 +1,25 @@
+{
+  "_description": "Maps each invalid fixture to the primary error code the validator must emit. Used by tools/receipt/test_receipt.py.",
+  "expected_error_codes": {
+    "const-invalid-schema-version.receipt.json": "const_invalid",
+    "digest-fingerprint-sha1.receipt.json": "digest_format_mismatch",
+    "digest-sha256-uppercase.receipt.json": "digest_format_mismatch",
+    "digest-sha256-wrong-length.receipt.json": "digest_format_mismatch",
+    "enum-invalid-delivery-state.receipt.json": "enum_invalid",
+    "hygiene-absolute-path.receipt.json": "hygiene_absolute_path",
+    "hygiene-github-token.receipt.json": "hygiene_credential",
+    "hygiene-private-endpoint.receipt.json": "hygiene_private_endpoint",
+    "hygiene-private-key.receipt.json": "hygiene_secret",
+    "invariant-installed-unverified.receipt.json": "state_invariant_invalid",
+    "invariant-rollback-wrong-state.receipt.json": "state_invariant_invalid",
+    "invariant-rolledback-null-target.receipt.json": "state_invariant_invalid",
+    "missing-required-asset-sha256.receipt.json": "missing_field",
+    "not-an-object.receipt.json": "type_invalid",
+    "pattern-invalid-timestamp.receipt.json": "pattern_invalid",
+    "transition-bad-initial.receipt.json": "state_transition_invalid",
+    "transition-from-rolled-back.receipt.json": "state_transition_invalid",
+    "transition-skip-forward.receipt.json": "state_transition_invalid",
+    "type-invalid-version-code.receipt.json": "type_invalid",
+    "unknown-field.receipt.json": "unknown_field"
+  }
+}

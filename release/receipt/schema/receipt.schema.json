@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://befeast.github.io/tx10-clock/release/receipt/receipt.schema.json",
+  "title": "TX10 Clock Release & Delivery Receipt",
+  "description": "Deterministic, public-safe contract describing a single release/delivery event for the TX10 Clock app. A receipt is a snapshot: where the artifact came from, what it is, who approved it, and where it currently sits in the delivery and verification lifecycle. Later release/install automation validates a receipt against this schema (plus the semantic rules documented in release/receipt/README.md) before making any delivery claim. No secret, private endpoint, local absolute path, or credential material may appear in any field.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "source",
+    "release",
+    "asset",
+    "package",
+    "signing",
+    "approval",
+    "delivery",
+    "verification",
+    "rollback"
+  ],
+  "properties": {
+    "schema_version": {
+      "description": "Contract version. Pinned so consumers can detect incompatible receipts.",
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "receipt_id": {
+      "description": "Opaque, human-readable identifier for this receipt. Not a secret.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$"
+    },
+    "note": {
+      "description": "Optional free-text note. Scanned by the hygiene layer like every other string.",
+      "type": "string",
+      "maxLength": 500
+    },
+    "source": {
+      "description": "Version-control origin of the build.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repo", "commit", "ref"],
+      "properties": {
+        "repo": {
+          "description": "owner/name slug of the source repository.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"
+        },
+        "commit": {
+          "description": "Full 40-hex source commit SHA-1.",
+          "type": "string",
+          "pattern": "^[0-9a-f:]+$"
+        },
+        "ref": {
+          "description": "Fully-qualified git ref the build came from, e.g. refs/tags/v1.2.0.",
+          "type": "string",
+          "pattern": "^refs/(tags|heads)/[A-Za-z0-9._/-]+$"
+        }
+      }
+    },
+    "release": {
+      "description": "GitHub Release identity. References only; never an absolute endpoint.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tag"],
+      "properties": {
+        "tag": {
+          "description": "Release tag, e.g. v1.2.0.",
+          "type": "string",
+          "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$"
+        },
+        "name": {
+          "description": "Human-readable release name.",
+          "type": "string",
+          "maxLength": 200
+        },
+        "path": {
+          "description": "Repo-relative release path, e.g. releases/tag/v1.2.0. Never an absolute URL or endpoint.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$"
+        }
+      }
+    },
+    "asset": {
+      "description": "The delivered release asset and its content digest.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["filename", "sha256", "size_bytes"],
+      "properties": {
+        "filename": {
+          "description": "Asset filename only. No path separators.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*\\.(apk|aab)$"
+        },
+        "sha256": {
+          "description": "SHA-256 digest of the asset. Exact format enforced by the digest layer.",
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]+$"
+        },
+        "size_bytes": {
+          "description": "Asset size in bytes.",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "package": {
+      "description": "Android package and version identity.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version_name", "version_code"],
+      "properties": {
+        "id": {
+          "description": "Application/package id, e.g. com.befeast.tx10clock.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+        },
+        "version_name": {
+          "description": "Human-readable version name, e.g. 1.2.0.",
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$"
+        },
+        "version_code": {
+          "description": "Monotonic integer version code.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "signing": {
+      "description": "Signing-certificate reference. A public fingerprint reference only; never a key, keystore, or certificate body.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["certificate_fingerprint_sha256"],
+      "properties": {
+        "certificate_fingerprint_sha256": {
+          "description": "SHA-256 fingerprint of the signing certificate, colon-separated hex (32 bytes). Exact format enforced by the digest layer.",
+          "type": "string",
+          "pattern": "^[0-9A-Fa-f:]+$"
+        },
+        "certificate_ref": {
+          "description": "Opaque public label for the signing certificate, e.g. release-cert-2026. Never a secret or path.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{1,63}$"
+        }
+      }
+    },
+    "approval": {
+      "description": "Who approved this release and when.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approved_by", "approved_at"],
+      "properties": {
+        "approved_by": {
+          "description": "Approver identity: a role or public handle, never a credential.",
+          "type": "string",
+          "pattern": "^[@A-Za-z0-9][A-Za-z0-9._-]{1,63}$"
+        },
+        "approved_at": {
+          "description": "Approval timestamp, RFC 3339 / ISO 8601 UTC (Z).",
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        }
+      }
+    },
+    "delivery": {
+      "description": "Current delivery state and the state it transitioned from.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "previous_state", "updated_at"],
+      "properties": {
+        "state": {
+          "description": "Current delivery state.",
+          "type": "string",
+          "enum": ["planned", "published", "delivered", "installed", "rolled_back", "failed"]
+        },
+        "previous_state": {
+          "description": "State this receipt transitioned from. null only for the initial receipt.",
+          "type": ["string", "null"],
+          "enum": ["planned", "published", "delivered", "installed", "rolled_back", "failed", null]
+        },
+        "updated_at": {
+          "description": "Delivery-state timestamp, RFC 3339 / ISO 8601 UTC (Z).",
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        }
+      }
+    },
+    "verification": {
+      "description": "Post-delivery verification outcome.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "state": {
+          "description": "Verification state.",
+          "type": "string",
+          "enum": ["unverified", "passed", "failed"]
+        },
+        "method": {
+          "description": "How verification was performed, e.g. sha256-match.",
+          "type": "string",
+          "enum": ["sha256-match", "signature-match", "boot-check", "manual"]
+        },
+        "checked_at": {
+          "description": "Verification timestamp, RFC 3339 / ISO 8601 UTC (Z).",
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        }
+      }
+    },
+    "rollback": {
+      "description": "Rollback target. Non-null only when delivery.state is rolled_back.",
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["to_release_tag", "to_receipt_id"],
+      "properties": {
+        "to_release_tag": {
+          "description": "Release tag rolled back to.",
+          "type": "string",
+          "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$"
+        },
+        "to_receipt_id": {
+          "description": "Receipt id rolled back to.",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$"
+        },
+        "reason": {
+          "description": "Free-text rollback reason. Scanned by the hygiene layer.",
+          "type": "string",
+          "maxLength": 500
+        }
+      }
+    }
+  }
+}
