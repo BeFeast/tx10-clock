@@ -4,7 +4,13 @@ plugins {
 
 android {
     namespace 'com.befeast.tx10clock'
+    // Compile against the TX10 runtime platform (API 29 — the pinned "Android
+    // platform 29" release input) with the pinned SDK Build Tools 36.0.0.
+    // Build Tools are decoupled from compileSdk: 36.0.0 (aapt2/d8/zipalign/
+    // apksigner) builds a compileSdk-29 app, which keeps the artifact matched
+    // to the device runtime. See release/toolchain.lock.json.
     compileSdk 29
+    buildToolsVersion "36.0.0"
 
     defaultConfig {
         applicationId "com.befeast.tx10clock"

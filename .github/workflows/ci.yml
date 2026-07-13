@@ -23,6 +23,40 @@ jobs:
         if: ${{ vars.ANDROID_SDK_LICENSE_ACCEPTED == 'true' }}
         run: echo "Recorded Android SDK license gate is open."
 
+  host-checks:
+    name: Host-only contracts, pins & hygiene (no SDK)
+    # These deterministic checks need only Python 3 + bash — no Android SDK,
+    # network, signing key, or device — so they run on every push/PR without
+    # the operator SDK-licence gate and give fast, unconditional PR coverage.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Release-evidence contract
+        run: bash tools/release-evidence/run-release-evidence-tests.sh
+
+      - name: Release/delivery receipt contract
+        run: bash tools/receipt/run-receipt-tests.sh
+
+      - name: Clock-configuration contract
+        run: bash tools/config-validator/run-config-tests.sh
+
+      - name: ADB delivery preflight contract
+        run: bash delivery/preflight/run-preflight-tests.sh
+
+      - name: Pinned release inputs
+        run: bash scripts/check-release-pins.sh
+
+      - name: No automated SDK licence acceptance
+        run: bash scripts/check-no-sdk-license-automation.sh
+
+      - name: Config core is renderer-agnostic
+        run: bash scripts/check-config-renderer-agnostic.sh
+
+      - name: Public-path hygiene
+        run: bash scripts/check-public-hygiene.sh
+
   verify:
     name: Build, static checks & offscreen golden verifier
     # Merging source does not manufacture legal acceptance. No Android action
@@ -34,22 +68,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
         with:
           # License acceptance is a human gate, not a CI side effect. The
           # operator-gated runner image must already provide accepted licenses.
           accept-android-sdk-licenses: false
-          packages: 'platform-tools platforms;android-29 build-tools;29.0.3'
+          # Pinned release inputs (release/toolchain.lock.json): compile against
+          # platform 29 with Build Tools 36.0.0 (AGP 9.2.1 requires 36.0.0).
+          packages: 'platform-tools platforms;android-29 build-tools;36.0.0'
 
       # Runs the documented outcome checks: clean build, Android Lint,
       # unit/static scene/format/config checks, the offscreen golden verifier,
@@ -59,7 +95,7 @@ jobs:
 
       - name: Upload golden diagnostics (on failure)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: golden-output
           path: app/build/golden-output/
@@ -67,7 +103,7 @@ jobs:
 
       - name: Upload unit/lint reports (on failure)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: reports
           path: |
@@ -77,7 +113,7 @@ jobs:
 
       - name: Upload unsigned APK for CI inspection only
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           # Signing/release distribution belongs to the release issue. This
           # artifact is deliberately not installable and must not be published

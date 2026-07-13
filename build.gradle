@@ -1,4 +1,10 @@
 // Top-level build file. Configuration is kept per-module in app/build.gradle.
+//
+// The Android Gradle Plugin version is a pinned release input (see
+// release/toolchain.lock.json and docs/releasing.md). AGP 9.2.1 requires its
+// tested Gradle 9.4.1 (pinned in gradle/wrapper/gradle-wrapper.properties),
+// JDK 17, and SDK Build Tools 36.0.0; it is an exact version with no dynamic
+// or SNAPSHOT component.
 plugins {
-    id 'com.android.application' version '7.4.2' apply false
+    id 'com.android.application' version '9.2.1' apply false
 }
