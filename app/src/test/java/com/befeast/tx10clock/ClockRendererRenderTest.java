@@ -45,12 +45,12 @@ public class ClockRendererRenderTest {
         assertEquals(0xFF000000, frame.getPixel(0, 0));
         assertEquals(0xFF000000, frame.getPixel(WIDTH - 1, HEIGHT - 1));
 
-        assertTrue("orange second hand/seconds are present",
+        assertTrue("orange second hand/calendar accent are present",
                 countPixelsNear(frame, 0xFFFF9F0A, 8) > 300);
         assertTrue("analog content occupies the accepted left region",
                 countNonBlack(frame, 48, 72, 588, 648) > 5000);
         assertTrue("digital content occupies the accepted right region",
-                countNonBlack(frame, 650, 176, 1232, 544) > 8000);
+                countNonBlack(frame, 650, 140, 1232, 544) > 8000);
     }
 
     @Test

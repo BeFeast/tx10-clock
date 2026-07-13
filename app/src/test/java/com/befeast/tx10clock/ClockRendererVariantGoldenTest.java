@@ -25,7 +25,7 @@ import java.time.ZonedDateTime;
  *
  * <ul>
  *   <li>a representative external-config change — the 24-hour readout, which
- *       reflows the digital lines ("22:09" with no AM/PM prefix); and</li>
+ *       reflows the time lockup ("22:09" with no AM/PM marker); and</li>
  *   <li>each declared burn-in extreme — the whole composition shifted to its
  *       {@code (-8,-8)} and {@code (+8,+8)} corners.</li>
  * </ul>
@@ -69,7 +69,7 @@ public class ClockRendererVariantGoldenTest {
             ZonedDateTime.of(2026, 7, 12, 22, 9, 42, 0, ZoneOffset.UTC);
 
     // The Gregorian calendar repeats every 400 years. These years therefore
-    // preserve SUN, JUL 12 22:09:42 while their local-minute indices select
+    // preserve Sunday, July 12 22:09:42 while their local-minute indices select
     // the (-8,-8) and (+8,+8) corners of the 17x17 burn-in scan.
     private static final ZonedDateTime BURN_IN_MINUS_MINUTE = FIXED_TIME.withYear(98826);
     private static final ZonedDateTime BURN_IN_PLUS_MINUTE = FIXED_TIME.withYear(109626);
