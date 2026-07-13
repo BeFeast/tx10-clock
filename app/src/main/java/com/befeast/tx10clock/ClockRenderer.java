@@ -134,16 +134,16 @@ public final class ClockRenderer {
         configureMainText();
         float referenceWidth = text.measureText(config.use24Hour ? "22:09" : "10:09");
         if (referenceWidth > 0f) {
-            text.setTextScaleX(535f / referenceWidth);
+            text.setTextScaleX(535f * sizeScale(config.digitalSizePercent) / referenceWidth);
         }
         text.setTextAlign(Paint.Align.CENTER);
         canvas.drawText(main, DIGITAL_X, 377f, text);
 
-        String prefix = ClockFormat.secondaryPrefix(now, config.use24Hour);
+        String prefix = ClockFormat.secondaryPrefix(now, config.use24Hour, config.showDate);
         String seconds = config.showSeconds ? ClockFormat.seconds(now) : "";
         configureSecondaryText();
         float naturalWidth = text.measureText(prefix) + text.measureText(seconds);
-        float targetWidth = config.use24Hour ? 495f : 535f;
+        float targetWidth = (config.use24Hour ? 495f : 535f) * sizeScale(config.secondarySizePercent);
         if (naturalWidth > 0f) {
             text.setTextScaleX(targetWidth / naturalWidth);
         }
@@ -168,8 +168,9 @@ public final class ClockRenderer {
         text.setColor(config.digitalColor);
         text.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
         text.setFakeBoldText(false);
-        text.setTextSize(190f);
+        text.setTextSize(190f * sizeScale(config.digitalSizePercent));
         text.setTextScaleX(1f);
+        // Letter spacing is expressed in em units, so it tracks the size scale.
         text.setLetterSpacing(-7f / 190f);
     }
 
@@ -177,8 +178,20 @@ public final class ClockRenderer {
         text.setColor(config.dateColor);
         text.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         text.setFakeBoldText(false);
-        text.setTextSize(38f);
+        text.setTextSize(38f * sizeScale(config.secondarySizePercent));
         text.setTextScaleX(1f);
+        // Letter spacing is expressed in em units, so it tracks the size scale.
         text.setLetterSpacing(2f / 38f);
+    }
+
+    /**
+     * The multiplier for a bounded (50..100) size percentage. Both the text
+     * size and the width the line is fitted into are scaled by this factor, so
+     * a smaller percentage shrinks the whole line uniformly about its layout
+     * anchor rather than distorting its glyphs. The default 100 yields 1.0, so
+     * the accepted contract sizes are unchanged.
+     */
+    private static float sizeScale(int percent) {
+        return percent / 100f;
     }
 }

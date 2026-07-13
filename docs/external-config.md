@@ -1,14 +1,18 @@
 # External configuration & runtime status
 
-This app is driven at runtime by a small, **renderer-agnostic** JSON
-configuration file it owns on external storage. This document is the contract for
-that transport: where the file lives, how to update it safely, exactly what is
+This app is driven at runtime by a small, strictly validated JSON configuration
+file it owns on external storage. This document is the contract for that
+transport: where the file lives, how to update it safely, exactly what is
 accepted, and what the app publishes back.
 
-> Scope: these settings are **behavioural only** — boot behaviour, time format,
-> whether seconds are shown, and the display time zone. They deliberately encode
-> **no** visual contract (colours, geometry, typography, assets, or screenshot
-> tolerances); those are owned by the separate visual package.
+> Scope: these settings cover behaviour (boot behaviour, time format, digital
+> seconds, display time zone) plus a small set of **bounded renderer
+> selections**: approved colour-role *names*, clipping-safe digital text sizes,
+> the compact-date toggle, and the burn-in shift enable/range. The file still
+> carries **no raw visual values** — no hex/packed colours, geometry,
+> typography, assets, or screenshot tolerances. Approved names resolve to the
+> accepted contract's values inside the renderer mapping; everything else about
+> the accepted visual contract is fixed and not configurable.
 
 ## Where the files live
 
@@ -58,13 +62,41 @@ next time the clock resumes.
 `config.json` must be a single JSON **object**. Every key is optional; omitted
 keys take their default. All fields are validated strictly (see below).
 
-| Key             | Type    | Default        | Notes |
-|-----------------|---------|----------------|-------|
-| `schemaVersion` | integer | `1`            | If present must equal `1`. |
-| `bootStart`     | boolean | `true`         | Auto-start the clock after reboot. |
-| `use24Hour`     | boolean | `false`        | 24-hour vs 12-hour digital readout. |
-| `showSeconds`   | boolean | `true`         | Show the second hand and seconds field. |
-| `timeZone`      | string  | *(device zone)*| IANA id, e.g. `America/New_York`; omit to follow the device. |
+| Key                    | Type    | Default        | Notes |
+|------------------------|---------|----------------|-------|
+| `schemaVersion`        | integer | `1`            | If present must equal `1`. |
+| `bootStart`            | boolean | `true`         | Auto-start the clock after reboot. |
+| `use24Hour`            | boolean | `false`        | 24-hour vs 12-hour digital readout. |
+| `showSeconds`          | boolean | `true`         | Show the second hand and seconds field. |
+| `timeZone`             | string  | *(device zone)*| IANA id, e.g. `America/New_York`; omit to follow the device. |
+| `digitalColor`         | string  | `"white"`      | Approved name for the digital time, hands, and numerals. |
+| `dateColor`            | string  | `"grey"`       | Approved name for the compact date. |
+| `tickColor`            | string  | `"silver"`     | Approved name for the minor tick marks. |
+| `accentColor`          | string  | `"orange"`     | Approved name for the second hand and digital seconds. |
+| `showDate`             | boolean | `true`         | Draw the compact English date (e.g. `SUN, JUL 12`) on the secondary line; when `false` the date is dropped (the 12-hour AM/PM marker stays). |
+| `digitalSizePercent`   | integer | `100`          | Main digital line size, `50`–`100` percent of the design size; shrinks the whole line uniformly about its anchor. |
+| `secondarySizePercent` | integer | `100`          | Secondary line size, `50`–`100` percent of the design size; shrinks the whole line uniformly about its anchor. |
+| `burnInEnabled`        | boolean | `true`         | Run the per-minute whole-composition burn-in shift. |
+| `burnInMaxShiftPx`     | integer | `8`            | Maximum shift amplitude, `0`–`8` design pixels; each axis is clamped to this, and `0` holds the composition still even when enabled. |
+
+### Approved colour names
+
+The four colour keys accept **only** these lowercase names, which resolve to the
+accepted visual contract's palette inside the renderer:
+
+| Name     | Contract role |
+|----------|---------------|
+| `white`  | primary (`#F5F5F7`) |
+| `silver` | ticks (`#D1D1D6`) |
+| `grey`   | secondary (`#A1A1A6`) |
+| `orange` | accent (`#FF9F0A`) |
+
+Raw colour values (`#RRGGBB`, `0xAARRGGBB`, etc.), other names, and other casings
+are rejected. The pure-black background is fixed and not configurable, and the
+approved set deliberately contains no name that would render content invisible
+on it. Size percentages are bounded to `50`–`100` so text can never exceed the
+clipping-safe design size, and `burnInMaxShiftPx` is bounded to the contract's
+`±8 px` translation envelope.
 
 Example:
 
@@ -74,7 +106,13 @@ Example:
   "bootStart": true,
   "use24Hour": true,
   "showSeconds": true,
-  "timeZone": "Europe/Berlin"
+  "timeZone": "Europe/Berlin",
+  "digitalColor": "white",
+  "accentColor": "orange",
+  "showDate": true,
+  "digitalSizePercent": 100,
+  "burnInEnabled": true,
+  "burnInMaxShiftPx": 8
 }
 ```
 
@@ -92,9 +130,10 @@ last-known-good below). Rejection reasons:
   silently keep the last; this one rejects the document).
 - **Unknown key** — any key outside the table above.
 - **Wrong type** — e.g. `"bootStart": "true"` (string, not boolean), or a
-  fractional `schemaVersion`.
-- **Out of range** — e.g. `schemaVersion` other than `1`, or an unknown /
-  over-long `timeZone`.
+  fractional `schemaVersion` / `digitalSizePercent` / `burnInMaxShiftPx`.
+- **Out of range** — e.g. `schemaVersion` other than `1`, an unknown /
+  over-long `timeZone`, a colour name outside the approved set, a size
+  percentage outside `50`–`100`, or `burnInMaxShiftPx` outside `0`–`8`.
 
 ## Last-known-good
 
@@ -130,7 +169,16 @@ rejected input, or secrets.
     "bootStart": true,
     "use24Hour": true,
     "showSeconds": true,
-    "timeZone": "Europe/Berlin"
+    "timeZone": "Europe/Berlin",
+    "digitalColor": "white",
+    "dateColor": "grey",
+    "tickColor": "silver",
+    "accentColor": "orange",
+    "showDate": true,
+    "digitalSizePercent": 100,
+    "secondarySizePercent": 100,
+    "burnInEnabled": true,
+    "burnInMaxShiftPx": 8
   }
 }
 ```

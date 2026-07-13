@@ -41,17 +41,41 @@ public final class ClockFormat {
 
     /** Grey portion of the second line; orange seconds are drawn separately. */
     public static String secondaryPrefix(ZonedDateTime now, boolean use24Hour) {
-        if (use24Hour) {
-            return compactDate(now) + " ";
+        return secondaryPrefix(now, use24Hour, true);
+    }
+
+    /**
+     * Grey portion of the second line, honouring the compact-date toggle. When
+     * {@code showDate} is false the date is dropped, leaving the 12-hour AM/PM
+     * marker on its own (and nothing at all in 24-hour form). The orange seconds
+     * field is drawn separately by the renderer.
+     */
+    public static String secondaryPrefix(ZonedDateTime now, boolean use24Hour,
+                                         boolean showDate) {
+        StringBuilder sb = new StringBuilder();
+        if (!use24Hour) {
+            sb.append(amPm(now)).append(' ');
         }
-        return amPm(now) + " " + compactDate(now) + " ";
+        if (showDate) {
+            sb.append(compactDate(now)).append(' ');
+        }
+        return sb.toString();
     }
 
     /** Exact second-line fixture useful outside the renderer. */
     public static String secondary(ZonedDateTime now, boolean use24Hour,
                                    boolean showSeconds) {
-        String prefix = secondaryPrefix(now, use24Hour).trim();
-        return showSeconds ? prefix + " " + seconds(now) : prefix;
+        return secondary(now, use24Hour, showSeconds, true);
+    }
+
+    /** Second-line fixture that also honours the compact-date toggle. */
+    public static String secondary(ZonedDateTime now, boolean use24Hour,
+                                   boolean showSeconds, boolean showDate) {
+        String prefix = secondaryPrefix(now, use24Hour, showDate).trim();
+        if (!showSeconds) {
+            return prefix;
+        }
+        return prefix.isEmpty() ? seconds(now) : prefix + " " + seconds(now);
     }
 
     /** Compatibility helper retained for callers from the initial scaffold. */

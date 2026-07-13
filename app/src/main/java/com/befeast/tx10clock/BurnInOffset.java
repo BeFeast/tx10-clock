@@ -65,6 +65,16 @@ public final class BurnInOffset {
     }
 
     /**
+     * The offset for a configured bound. Each bound gets its own complete
+     * serpentine grid, so reducing the amplitude still changes position at
+     * every minute boundary instead of clamping several consecutive default
+     * positions to the same edge value.
+     */
+    public static BurnInOffset at(ZonedDateTime now, int boundPx) {
+        return forMinuteIndex(minuteIndexOf(now), boundPx);
+    }
+
+    /**
      * The local wall-clock minute {@code now} falls in, counted from the
      * local epoch. Uses the wall-clock fields (not the instant) so the
      * schedule follows what the viewer sees on screen.
@@ -75,14 +85,29 @@ public final class BurnInOffset {
 
     /** The offset for a given minute index; pure and total for any long. */
     public static BurnInOffset forMinuteIndex(long minuteIndex) {
-        int cell = (int) Math.floorMod(minuteIndex, CYCLE_MINUTES);
-        int row = cell / SPAN;
-        int col = cell % SPAN;
+        return forMinuteIndex(minuteIndex, BOUND_PX);
+    }
+
+    /**
+     * Offset for one minute and a caller-selected bound in
+     * {@code [0, BOUND_PX]}. The default overload remains the exact accepted
+     * 17x17 contract; smaller bounds traverse their own full grid.
+     */
+    public static BurnInOffset forMinuteIndex(long minuteIndex, int boundPx) {
+        if (boundPx < 0 || boundPx > BOUND_PX) {
+            throw new IllegalArgumentException(
+                    "boundPx must be between 0 and " + BOUND_PX);
+        }
+        int span = 2 * boundPx + 1;
+        int cycleMinutes = span * span;
+        int cell = (int) Math.floorMod(minuteIndex, cycleMinutes);
+        int row = cell / span;
+        int col = cell % span;
         // Even rows scan left-to-right, odd rows right-to-left, so each step
         // within the cycle moves exactly one pixel on exactly one axis; the
-        // wrap jumps from the (+8,+8) corner back to (-8,-8).
-        int x = (row % 2 == 0 ? col : SPAN - 1 - col) - BOUND_PX;
-        int y = row - BOUND_PX;
+        // wrap jumps from the positive corner back to the negative corner.
+        int x = (row % 2 == 0 ? col : span - 1 - col) - boundPx;
+        int y = row - boundPx;
         return new BurnInOffset(x, y);
     }
 

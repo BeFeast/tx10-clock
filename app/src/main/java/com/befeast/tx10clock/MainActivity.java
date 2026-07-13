@@ -61,9 +61,9 @@ public final class MainActivity extends Activity {
         super.onResume();
 
         // Reload after any atomic config replacement that happened while paused,
-        // then apply the behavioural settings and re-publish status.
+        // then apply the strictly validated settings and re-publish status.
         ExternalConfig config = configStore.reload();
-        clockView.apply(effectiveClockConfig(config), timeSourceFor(config));
+        clockView.apply(ClockConfig.fromExternal(config), timeSourceFor(config));
         clockView.start();
         publishStatus();
     }
@@ -72,18 +72,6 @@ public final class MainActivity extends Activity {
     protected void onPause() {
         super.onPause();
         clockView.stop();
-    }
-
-    /**
-     * Map the renderer-agnostic external config onto the renderer's own
-     * {@link ClockConfig}: the elegant theme's colours/geometry are untouched;
-     * only the behavioural 12/24-hour and seconds toggles are threaded through.
-     */
-    private static ClockConfig effectiveClockConfig(ExternalConfig config) {
-        return ClockConfig.defaultConfig().toBuilder()
-                .use24Hour(config.use24Hour)
-                .showSeconds(config.showSeconds)
-                .build();
     }
 
     private static TimeSource timeSourceFor(ExternalConfig config) {

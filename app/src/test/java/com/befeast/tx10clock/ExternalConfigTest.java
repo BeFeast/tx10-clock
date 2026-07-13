@@ -36,6 +36,21 @@ public class ExternalConfigTest {
     }
 
     @Test
+    public void defaultsKeepAcceptedRendererSelections() {
+        ExternalConfig c = ExternalConfig.defaults();
+        assertEquals("white", c.digitalColor);
+        assertEquals("grey", c.dateColor);
+        assertEquals("silver", c.tickColor);
+        assertEquals("orange", c.accentColor);
+        assertTrue(c.showDate);
+        assertEquals(100, c.digitalSizePercent);
+        assertEquals(100, c.secondarySizePercent);
+        assertTrue(c.burnInEnabled);
+        assertEquals(ExternalConfig.MAX_BURN_IN_SHIFT_PX, c.burnInMaxShiftPx);
+        assertEquals(8, ExternalConfig.MAX_BURN_IN_SHIFT_PX);
+    }
+
+    @Test
     public void emptyObjectYieldsDefaults() throws Exception {
         assertEquals(ExternalConfig.defaults(), ExternalConfig.parse("{}"));
     }
@@ -59,6 +74,40 @@ public class ExternalConfigTest {
         assertFalse(c.use24Hour);  // 12-hour default retained
         assertTrue(c.showSeconds); // default retained
         assertNull(c.timeZone);
+    }
+
+    @Test
+    public void fullRendererSelectionDocumentParses() throws Exception {
+        ExternalConfig c = ExternalConfig.parse(
+                "{\"digitalColor\":\"silver\",\"dateColor\":\"white\","
+                        + "\"tickColor\":\"grey\",\"accentColor\":\"white\","
+                        + "\"showDate\":false,\"digitalSizePercent\":75,"
+                        + "\"secondarySizePercent\":50,"
+                        + "\"burnInEnabled\":false,\"burnInMaxShiftPx\":4}");
+        assertEquals("silver", c.digitalColor);
+        assertEquals("white", c.dateColor);
+        assertEquals("grey", c.tickColor);
+        assertEquals("white", c.accentColor);
+        assertFalse(c.showDate);
+        assertEquals(75, c.digitalSizePercent);
+        assertEquals(50, c.secondarySizePercent);
+        assertFalse(c.burnInEnabled);
+        assertEquals(4, c.burnInMaxShiftPx);
+    }
+
+    @Test
+    public void sizeAndBurnInBoundsAreInclusive() throws Exception {
+        ExternalConfig low = ExternalConfig.parse(
+                "{\"digitalSizePercent\":50,\"secondarySizePercent\":50,\"burnInMaxShiftPx\":0}");
+        assertEquals(50, low.digitalSizePercent);
+        assertEquals(50, low.secondarySizePercent);
+        assertEquals(0, low.burnInMaxShiftPx);
+
+        ExternalConfig high = ExternalConfig.parse(
+                "{\"digitalSizePercent\":100,\"secondarySizePercent\":100,\"burnInMaxShiftPx\":8}");
+        assertEquals(100, high.digitalSizePercent);
+        assertEquals(100, high.secondarySizePercent);
+        assertEquals(8, high.burnInMaxShiftPx);
     }
 
     @Test
@@ -126,6 +175,51 @@ public class ExternalConfigTest {
         assertEquals(ConfigException.Reason.WRONG_TYPE, reasonOf("{\"schemaVersion\":\"1\"}"));
         // A fractional number is not an acceptable integer schemaVersion.
         assertEquals(ConfigException.Reason.WRONG_TYPE, reasonOf("{\"schemaVersion\":1.5}"));
+    }
+
+    @Test
+    public void wrongTypeRendererSelectionsRejected() {
+        assertEquals(ConfigException.Reason.WRONG_TYPE, reasonOf("{\"digitalColor\":7}"));
+        assertEquals(ConfigException.Reason.WRONG_TYPE, reasonOf("{\"accentColor\":true}"));
+        assertEquals(ConfigException.Reason.WRONG_TYPE, reasonOf("{\"showDate\":\"yes\"}"));
+        assertEquals(ConfigException.Reason.WRONG_TYPE, reasonOf("{\"digitalSizePercent\":\"90\"}"));
+        // A fractional size or shift is not an acceptable integer.
+        assertEquals(ConfigException.Reason.WRONG_TYPE, reasonOf("{\"digitalSizePercent\":75.5}"));
+        assertEquals(ConfigException.Reason.WRONG_TYPE, reasonOf("{\"burnInMaxShiftPx\":4.2}"));
+        assertEquals(ConfigException.Reason.WRONG_TYPE, reasonOf("{\"burnInEnabled\":0}"));
+    }
+
+    @Test
+    public void unapprovedColorNameRejected() {
+        // Only names in the approved palette are accepted — never raw values.
+        assertEquals(ConfigException.Reason.OUT_OF_RANGE, reasonOf("{\"digitalColor\":\"red\"}"));
+        assertEquals(ConfigException.Reason.OUT_OF_RANGE, reasonOf("{\"dateColor\":\"#FF0000\"}"));
+        assertEquals(ConfigException.Reason.OUT_OF_RANGE, reasonOf("{\"tickColor\":\"0xFF00FF00\"}"));
+        assertEquals(ConfigException.Reason.OUT_OF_RANGE, reasonOf("{\"accentColor\":\"ORANGE\"}"));
+        assertEquals(ConfigException.Reason.OUT_OF_RANGE, reasonOf("{\"accentColor\":\"black\"}"));
+        assertEquals(ConfigException.Reason.OUT_OF_RANGE, reasonOf("{\"digitalColor\":\"\"}"));
+    }
+
+    @Test
+    public void outOfRangeSizesRejected() {
+        assertEquals(ConfigException.Reason.OUT_OF_RANGE, reasonOf("{\"digitalSizePercent\":49}"));
+        assertEquals(ConfigException.Reason.OUT_OF_RANGE, reasonOf("{\"digitalSizePercent\":101}"));
+        assertEquals(ConfigException.Reason.OUT_OF_RANGE, reasonOf("{\"secondarySizePercent\":0}"));
+        assertEquals(ConfigException.Reason.OUT_OF_RANGE, reasonOf("{\"secondarySizePercent\":200}"));
+        assertEquals(ConfigException.Reason.OUT_OF_RANGE, reasonOf("{\"digitalSizePercent\":-75}"));
+    }
+
+    @Test
+    public void outOfRangeBurnInShiftRejected() {
+        assertEquals(ConfigException.Reason.OUT_OF_RANGE, reasonOf("{\"burnInMaxShiftPx\":9}"));
+        assertEquals(ConfigException.Reason.OUT_OF_RANGE, reasonOf("{\"burnInMaxShiftPx\":-1}"));
+        assertEquals(ConfigException.Reason.OUT_OF_RANGE, reasonOf("{\"burnInMaxShiftPx\":800}"));
+    }
+
+    @Test
+    public void duplicateRendererKeyRejected() {
+        assertEquals(ConfigException.Reason.DUPLICATE_KEY,
+                reasonOf("{\"accentColor\":\"orange\",\"accentColor\":\"white\"}"));
     }
 
     @Test

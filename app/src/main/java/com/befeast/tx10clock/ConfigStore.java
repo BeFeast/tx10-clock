@@ -152,7 +152,16 @@ public final class ConfigStore {
         sb.append("    \"use24Hour\": ").append(current.use24Hour).append(",\n");
         sb.append("    \"showSeconds\": ").append(current.showSeconds).append(",\n");
         sb.append("    \"timeZone\": ")
-                .append(current.timeZone == null ? "null" : quote(current.timeZone)).append("\n");
+                .append(current.timeZone == null ? "null" : quote(current.timeZone)).append(",\n");
+        sb.append("    \"digitalColor\": ").append(quote(current.digitalColor)).append(",\n");
+        sb.append("    \"dateColor\": ").append(quote(current.dateColor)).append(",\n");
+        sb.append("    \"tickColor\": ").append(quote(current.tickColor)).append(",\n");
+        sb.append("    \"accentColor\": ").append(quote(current.accentColor)).append(",\n");
+        sb.append("    \"showDate\": ").append(current.showDate).append(",\n");
+        sb.append("    \"digitalSizePercent\": ").append(current.digitalSizePercent).append(",\n");
+        sb.append("    \"secondarySizePercent\": ").append(current.secondarySizePercent).append(",\n");
+        sb.append("    \"burnInEnabled\": ").append(current.burnInEnabled).append(",\n");
+        sb.append("    \"burnInMaxShiftPx\": ").append(current.burnInMaxShiftPx).append("\n");
         sb.append("  }\n");
         sb.append("}\n");
         return sb.toString();
