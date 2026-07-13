@@ -265,6 +265,15 @@ class SemanticTests(unittest.TestCase):
             any(error["path"] == "$.verification.verified_at" for error in errors)
         )
 
+    def test_verified_delivery_without_delivered_history_is_rejected(self):
+        doc = valid_doc()
+        doc["delivery"]["history"] = doc["delivery"]["history"][:-1]
+        errors = vr.validate_document(doc)
+        self.assertIn("state_invalid", error_codes(errors))
+        self.assertTrue(
+            any(error["path"] == "$.delivery.history" for error in errors)
+        )
+
 
 class HygieneTests(unittest.TestCase):
     def check_reason_rejected(self, reason):
@@ -280,6 +289,9 @@ class HygieneTests(unittest.TestCase):
 
     def test_local_absolute_paths_rejected(self):
         self.check_reason_rejected("copied from /Users/nobody/Desktop/app.apk")
+        self.check_reason_rejected("copied from /workspace/build/output.log")
+        self.check_reason_rejected("copied from /data/releases/app.apk")
+        self.check_reason_rejected("copied from /$WORKSPACE/output.log")
         self.check_reason_rejected("cache at C:\\temp\\build")
         self.check_reason_rejected("see ~/notes.txt")
 
@@ -294,6 +306,21 @@ class HygieneTests(unittest.TestCase):
         # Assembled at runtime so the literal never trips the repo's own
         # public-hygiene scan over tracked files.
         self.check_reason_rejected("ghp" + "_" + "0123456789abcdef0123456789")
+        jwt = ".".join(("eyJ" + "header00", "payload000", "signature0"))
+        self.check_reason_rejected("authorization artifact " + jwt)
+
+    def test_dotted_public_identifiers_and_urls_are_not_credentials_or_paths(self):
+        doc = valid_doc()
+        doc["package"]["application_id"] = "abcdefgh.ijklmnop.qrstuvwx"
+        doc["approval"]["approved_by"] = "release-v2.automation.build-host"
+        self.assertEqual(vr.validate_document(doc), [])
+
+        doc, errors = vr.parse_receipt(
+            load_fixture("valid", "rolled-back-failed.json")
+        )
+        self.assertEqual(errors, [])
+        doc["rollback"]["reason"] = "see https://example.com/release-notes"
+        self.assertNotIn("hygiene_violation", error_codes(vr.validate_document(doc)))
 
     def test_hygiene_scans_every_string_field(self):
         # 'localhost' satisfies the identity-slug format but is still a
@@ -337,6 +364,16 @@ class CliTests(unittest.TestCase):
         for err in report["errors"]:
             self.assertEqual(sorted(err), ["code", "message", "path"])
             self.assertIn(err["code"], vr.ERROR_CODES)
+
+    def test_malformed_verified_history_returns_json_not_traceback(self):
+        doc = valid_doc()
+        doc["delivery"]["history"] = doc["delivery"]["history"][:-1]
+        proc = self.run_cli("-", stdin=json.dumps(doc))
+        self.assertEqual(proc.returncode, 1)
+        self.assertEqual(proc.stderr, "")
+        report = json.loads(proc.stdout)
+        self.assertFalse(report["valid"])
+        self.assertIn("state_invalid", error_codes(report["errors"]))
 
     def test_stdin_input(self):
         proc = self.run_cli("-", stdin=load_fixture("valid", "built-pending.json"))
