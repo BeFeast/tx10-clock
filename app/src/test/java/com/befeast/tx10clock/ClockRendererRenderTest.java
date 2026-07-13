@@ -67,37 +67,60 @@ public class ClockRendererRenderTest {
         Bitmap frame = renderFixedFrame();
         ClockConfig cfg = ClockConfig.defaultConfig();
 
-        // Corners are untouched background.
+        // Pure-black corners: the frame is drawn over pure black.
+        assertEquals(0xFF000000, cfg.backgroundColor);
         assertEquals(cfg.backgroundColor, frame.getPixel(6, 6));
         assertEquals(cfg.backgroundColor, frame.getPixel(WIDTH - 6, HEIGHT - 6));
 
-        // The clock face fills its disk: most pixels inside the face radius are
-        // no longer background. (The exact centre is the hub, drawn back in the
-        // background colour, so we sample the whole disk rather than one point.)
-        int cx = WIDTH / 2;
-        int cy = Math.round(HEIGHT * 0.40f);
-        int r = Math.round(Math.min(WIDTH, HEIGHT) * 0.33f);
-        int faceTotal = 0;
-        int faceNonBackground = 0;
-        for (int dy = -r; dy <= r; dy += 3) {
-            for (int dx = -r; dx <= r; dx += 3) {
-                if (dx * dx + dy * dy > r * r) {
+        // The analog face lives in the LEFT band. Its ticks and hands paint a
+        // meaningful number of non-background pixels inside the disk...
+        final int cx = Math.round(WIDTH * 0.255f);
+        final int cy = Math.round(HEIGHT * 0.5f);
+        final int r = Math.round(Math.min(WIDTH * 0.22f, HEIGHT * 0.405f));
+        assertTrue("face is on the left band", cx < WIDTH / 2);
+
+        int diskTotal = 0;
+        int diskNonBackground = 0;
+        int innerTotal = 0;
+        int innerBackground = 0;
+        for (int dy = -r; dy <= r; dy += 2) {
+            for (int dx = -r; dx <= r; dx += 2) {
+                final int d2 = dx * dx + dy * dy;
+                if (d2 > r * r) {
                     continue;
                 }
-                faceTotal++;
-                if (frame.getPixel(cx + dx, cy + dy) != cfg.backgroundColor) {
-                    faceNonBackground++;
+                final boolean bg = frame.getPixel(cx + dx, cy + dy) == cfg.backgroundColor;
+                diskTotal++;
+                if (!bg) {
+                    diskNonBackground++;
+                }
+                // ...yet the face stays MINIMAL: the deep interior (inside 0.5r,
+                // clear of ticks and mostly clear of hands) is largely black, so
+                // this is not an accidental filled disk.
+                if (d2 < (r * r) / 4) {
+                    innerTotal++;
+                    if (bg) {
+                        innerBackground++;
+                    }
                 }
             }
         }
-        assertTrue("clock face should cover most of its disk",
-                faceNonBackground > faceTotal / 2);
+        assertTrue("analog ticks/hands should paint the left face",
+                diskNonBackground > 300);
+        assertTrue("minimal face: deep interior stays mostly black over pure black",
+                innerBackground > innerTotal / 2);
 
-        // The cyan accent (second hand / hub) is present somewhere on the face.
+        // The cyan accent (second hand / hub / digital seconds) is present.
         assertTrue("expected cyan accent pixels", countAccentPixels(frame) > 50);
 
-        // The digital readout band near the bottom contains bright text pixels.
-        assertTrue("expected bright digital text", hasBrightPixelsInBand(frame, 0.82f, 0.90f));
+        // The maximally large digital readout lives in the RIGHT band: many
+        // bright near-white text pixels appear right of centre, around the
+        // vertical middle...
+        assertTrue("expected bright digital text on the right",
+                countBrightPixelsInRegion(frame, 0.55f, 1.0f, 0.25f, 0.75f) > 200);
+        // ...and the big digital block is not down in the far-left band.
+        assertTrue("far-left band should not hold the big digital block",
+                countBrightPixelsInRegion(frame, 0.0f, 0.15f, 0.25f, 0.75f) < 50);
     }
 
     @Test
@@ -145,21 +168,26 @@ public class ClockRendererRenderTest {
         return count;
     }
 
-    private static boolean hasBrightPixelsInBand(Bitmap frame, float topFrac, float bottomFrac) {
+    /** Counts near-white ("bright") pixels in a fractional sub-rectangle. */
+    private static int countBrightPixelsInRegion(
+            Bitmap frame, float leftFrac, float rightFrac, float topFrac, float bottomFrac) {
+        int left = Math.round(WIDTH * leftFrac);
+        int right = Math.round(WIDTH * rightFrac);
         int top = Math.round(HEIGHT * topFrac);
         int bottom = Math.round(HEIGHT * bottomFrac);
+        int count = 0;
         for (int y = top; y < bottom; y++) {
-            for (int x = 0; x < WIDTH; x++) {
+            for (int x = left; x < right; x++) {
                 int p = frame.getPixel(x, y);
                 int r = (p >>> 16) & 0xFF;
                 int g = (p >>> 8) & 0xFF;
                 int b = p & 0xFF;
                 if (r > 200 && g > 200 && b > 200) {
-                    return true;
+                    count++;
                 }
             }
         }
-        return false;
+        return count;
     }
 
     private static File outputDir() {

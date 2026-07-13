@@ -2,31 +2,36 @@ package com.befeast.tx10clock;
 
 import android.content.Context;
 import android.graphics.Canvas;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.AttributeSet;
+import android.view.Choreographer;
 import android.view.View;
 
 import java.time.ZonedDateTime;
 
 /**
  * The on-screen surface. It delegates all drawing to {@link ClockRenderer} and
- * simply invalidates itself once per second (aligned to the wall-clock second)
- * so the second hand and digital readout stay in step with real time.
+ * redraws once per display frame while visible, driven by {@link Choreographer}
+ * so the analog second hand sweeps smoothly rather than ticking. Each frame the
+ * renderer reads the current instant (including sub-second nanos) from the
+ * injected {@link TimeSource}, so the sweep and the digital readout stay locked
+ * to real time with no accumulating drift.
  */
 public final class ClockView extends View {
 
     private final ClockRenderer renderer;
     private final TimeSource timeSource;
-    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Choreographer choreographer = Choreographer.getInstance();
 
     private boolean running;
 
-    private final Runnable tick = new Runnable() {
+    private final Choreographer.FrameCallback frameCallback = new Choreographer.FrameCallback() {
         @Override
-        public void run() {
+        public void doFrame(long frameTimeNanos) {
+            if (!running) {
+                return;
+            }
             invalidate();
-            scheduleNextTick();
+            choreographer.postFrameCallback(this);
         }
     };
 
@@ -40,28 +45,19 @@ public final class ClockView extends View {
         this.timeSource = TimeSource.system();
     }
 
-    /** Begin the once-per-second redraw loop. Idempotent. */
+    /** Begin the per-frame redraw loop. Idempotent. */
     public void start() {
         if (running) {
             return;
         }
         running = true;
-        scheduleNextTick();
+        choreographer.postFrameCallback(frameCallback);
     }
 
     /** Stop redrawing (e.g. when the Activity is paused). */
     public void stop() {
         running = false;
-        handler.removeCallbacks(tick);
-    }
-
-    private void scheduleNextTick() {
-        if (!running) {
-            return;
-        }
-        // Fire on the next whole second to keep the ticking crisp.
-        final long delay = 1000L - (System.currentTimeMillis() % 1000L);
-        handler.postDelayed(tick, delay);
+        choreographer.removeFrameCallback(frameCallback);
     }
 
     @Override

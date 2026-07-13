@@ -14,12 +14,13 @@ import org.junit.Test;
 public class ClockConfigTest {
 
     @Test
-    public void defaultConfigIsOpaqueDarkTheme() {
+    public void defaultConfigIsElegantPureBlackTheme() {
         ClockConfig c = ClockConfig.defaultConfig();
-        assertEquals(0xFF0E1726, c.backgroundColor);
-        assertEquals(0xFF1B2A41, c.faceColor);
+        // The accepted design renders over pure black.
+        assertEquals(0xFF000000, c.backgroundColor);
         assertEquals(0xFF4FC3F7, c.secondHandColor);
-        assertTrue(c.use24Hour);
+        // Default readout is 12-hour (small AM/PM) with seconds visible.
+        assertFalse(c.use24Hour);
         assertTrue(c.showSeconds);
         // Every colour must be fully opaque so frames have no alpha bleed.
         for (int argb : new int[]{
