@@ -1,5 +1,10 @@
 name: CI
 
+env:
+  ANDROID_PLATFORM: '29'
+  ANDROID_BUILD_TOOLS: '36.0.0'
+  ANDROID_CMDLINE_TOOLS_BUILD: '14742923'
+
 on:
   push:
     branches: [ main ]
@@ -83,10 +88,16 @@ jobs:
           # License acceptance is a human gate, not a CI side effect. The
           # operator-gated runner image must already provide accepted licenses.
           accept-android-sdk-licenses: false
-          cmdline-tools-version: '14742923'
           # Pinned release inputs (release/toolchain.lock.json): compile against
           # platform 29 with Build Tools 36.0.0 (AGP 9.2.1 requires 36.0.0).
-          packages: 'platform-tools platforms;android-29 build-tools;36.0.0'
+          cmdline-tools-version: ${{ env.ANDROID_CMDLINE_TOOLS_BUILD }}
+
+      - name: Install pinned SDK packages without accepting licences
+        run: |
+          sdkmanager --install \
+            'platform-tools' \
+            'platforms;android-${{ env.ANDROID_PLATFORM }}' \
+            'build-tools;${{ env.ANDROID_BUILD_TOOLS }}' </dev/null
 
       # Runs the documented outcome checks: clean build, Android Lint,
       # unit/static scene/format/config checks, the offscreen golden verifier,

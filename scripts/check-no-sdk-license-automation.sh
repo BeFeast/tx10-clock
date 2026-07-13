@@ -21,6 +21,7 @@ forbidden=(
     'accept-android-sdk-licenses:[[:space:]]*true'
     'accept-android-sdk-licenses[[:space:]]*=[[:space:]]*true'
     '--accept-licenses'
+    '^[[:space:]]+packages:'             # setup-android feeds "y" to every package install
 )
 
 fail=0

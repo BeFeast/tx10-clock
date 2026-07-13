@@ -70,10 +70,11 @@ pkg_revision() {
 
 PLATFORM_DIR="$ANDROID_SDK_ROOT/platforms/android-29"
 BT_DIR="$ANDROID_SDK_ROOT/build-tools/36.0.0"
-CT_DIR="$ANDROID_SDK_ROOT/cmdline-tools/latest"
+: "${ANDROID_CMDLINE_TOOLS_BUILD:?}"
+CT_DIR="$ANDROID_SDK_ROOT/cmdline-tools/$ANDROID_CMDLINE_TOOLS_BUILD"
 [ -d "$PLATFORM_DIR" ] || die "platform android-29 not installed"
 [ -d "$BT_DIR" ] || die "build-tools 36.0.0 not installed"
-[ -d "$CT_DIR" ] || die "command-line tools not installed under cmdline-tools/latest"
+[ -d "$CT_DIR" ] || die "pinned command-line tools build not installed"
 
 # --- Assemble + validate the evidence document -------------------------------
 EVIDENCE="$OUT/release-evidence.json"
