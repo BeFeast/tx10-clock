@@ -2,33 +2,17 @@ package com.befeast.tx10clock;
 
 import android.content.Context;
 import android.graphics.Canvas;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.AttributeSet;
 import android.view.View;
 
 import java.time.ZonedDateTime;
 
-/**
- * The on-screen surface. It delegates all drawing to {@link ClockRenderer} and
- * simply invalidates itself once per second (aligned to the wall-clock second)
- * so the second hand and digital readout stay in step with real time.
- */
+/** Full-frame clock surface with display-synchronised smooth animation. */
 public final class ClockView extends View {
 
     private ClockRenderer renderer;
     private TimeSource timeSource;
-    private final Handler handler = new Handler(Looper.getMainLooper());
-
     private boolean running;
-
-    private final Runnable tick = new Runnable() {
-        @Override
-        public void run() {
-            invalidate();
-            scheduleNextTick();
-        }
-    };
 
     public ClockView(Context context) {
         this(context, null);
@@ -36,49 +20,34 @@ public final class ClockView extends View {
 
     public ClockView(Context context, AttributeSet attrs) {
         super(context, attrs);
-        this.renderer = new ClockRenderer(ClockConfig.defaultConfig());
-        this.timeSource = TimeSource.system();
+        renderer = new ClockRenderer(ClockConfig.defaultConfig());
+        timeSource = TimeSource.system();
     }
 
-    /**
-     * Swap the renderer configuration and time source at runtime (e.g. after an
-     * external config reload). Only behavioural settings — 12/24-hour, seconds,
-     * time zone — flow in here; the visual theme itself is unchanged. Triggers a
-     * redraw so the change is visible immediately.
-     */
-    public void apply(ClockConfig config, TimeSource timeSource) {
-        this.renderer = new ClockRenderer(config);
-        this.timeSource = timeSource;
-        invalidate();
+    /** Atomically apply a newly accepted behavioral config on the UI thread. */
+    public void apply(ClockConfig config, TimeSource source) {
+        renderer = new ClockRenderer(config);
+        timeSource = source;
+        postInvalidateOnAnimation();
     }
 
-    /** Begin the once-per-second redraw loop. Idempotent. */
     public void start() {
-        if (running) {
-            return;
+        if (!running) {
+            running = true;
+            postInvalidateOnAnimation();
         }
-        running = true;
-        scheduleNextTick();
     }
 
-    /** Stop redrawing (e.g. when the Activity is paused). */
     public void stop() {
         running = false;
-        handler.removeCallbacks(tick);
-    }
-
-    private void scheduleNextTick() {
-        if (!running) {
-            return;
-        }
-        // Fire on the next whole second to keep the ticking crisp.
-        final long delay = 1000L - (System.currentTimeMillis() % 1000L);
-        handler.postDelayed(tick, delay);
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
-        final ZonedDateTime now = timeSource.now();
+        ZonedDateTime now = timeSource.now();
         renderer.render(canvas, getWidth(), getHeight(), now);
+        if (running) {
+            postInvalidateOnAnimation();
+        }
     }
 }

@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Clock;
+import java.util.Locale;
 
 /**
  * File-backed store for the app-owned external configuration and the
@@ -138,7 +139,8 @@ public final class ConfigStore {
         StringBuilder sb = new StringBuilder(256);
         sb.append("{\n");
         sb.append("  \"statusSchemaVersion\": ").append(STATUS_SCHEMA_VERSION).append(",\n");
-        sb.append("  \"configSource\": ").append(quote(source.name().toLowerCase())).append(",\n");
+        sb.append("  \"configSource\": ")
+                .append(quote(source.name().toLowerCase(Locale.ROOT))).append(",\n");
         sb.append("  \"lastReloadRejected\": ").append(lastRejectReason != null).append(",\n");
         sb.append("  \"lastRejectReason\": ")
                 .append(lastRejectReason == null ? "null" : quote(lastRejectReason.name())).append(",\n");

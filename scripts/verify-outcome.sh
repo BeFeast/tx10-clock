@@ -105,7 +105,11 @@ ok "package com.befeast.tx10clock, versionName 0.1.0, SDK 29, no native-code"
 log "APK native-library check (no lib/**)"
 scripts/check-no-native-libs.sh "$APK" || die "APK contains native libraries"
 
-# --- 5  public-path hygiene --------------------------------------------------
+# --- 5  visual-contract integrity (host-only) --------------------------------
+log "Visual-contract integrity (hashes, schema, image dimensions)"
+scripts/verify-visual-contract.sh || die "visual-contract verification failed"
+
+# --- 6  public-path hygiene --------------------------------------------------
 log "Public-path hygiene"
 scripts/check-public-hygiene.sh || die "public-path hygiene check failed"
 

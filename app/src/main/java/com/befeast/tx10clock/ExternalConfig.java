@@ -41,7 +41,7 @@ public final class ExternalConfig {
     /** Whether the app auto-starts after {@code BOOT_COMPLETED}. Defaults true. */
     public final boolean bootStart;
 
-    /** Whether the digital readout uses 24-hour form. Defaults true. */
+    /** Whether the digital readout uses 24-hour form. Defaults false. */
     public final boolean use24Hour;
 
     /** Whether the second hand and seconds field are shown. Defaults true. */
@@ -219,7 +219,7 @@ public final class ExternalConfig {
     /** Fluent builder; every field starts at its documented default. */
     public static final class Builder {
         private boolean bootStart = true;
-        private boolean use24Hour = true;
+        private boolean use24Hour = false;
         private boolean showSeconds = true;
         private String timeZone = null;
 

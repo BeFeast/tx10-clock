@@ -62,7 +62,7 @@ keys take their default. All fields are validated strictly (see below).
 |-----------------|---------|----------------|-------|
 | `schemaVersion` | integer | `1`            | If present must equal `1`. |
 | `bootStart`     | boolean | `true`         | Auto-start the clock after reboot. |
-| `use24Hour`     | boolean | `true`         | 24-hour vs 12-hour digital readout. |
+| `use24Hour`     | boolean | `false`        | 24-hour vs 12-hour digital readout. |
 | `showSeconds`   | boolean | `true`         | Show the second hand and seconds field. |
 | `timeZone`      | string  | *(device zone)*| IANA id, e.g. `America/New_York`; omit to follow the device. |
 

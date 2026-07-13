@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "ci_golden": {
+    "viewport_px": [1280, 720],
+    "pixel_format": "ARGB_8888",
+    "max_changed_pixel_ratio": 0.001,
+    "changed_pixel_channel_delta_threshold": 8,
+    "max_mean_absolute_channel_error": 1.0,
+    "failure_artifacts": ["actual.png", "expected.png", "diff.png"]
+  },
+  "live_tx10": {
+    "normalize_to_px": [1280, 720],
+    "minimum_ssim": 0.985,
+    "anchor_tolerance_px": 3,
+    "solid_color_channel_tolerance": 3,
+    "notes": "Font rasterization and HDMI screenshot capture may differ from the deterministic host golden; geometry, text content, hierarchy, colors, and edge anchors remain binding."
+  }
+}

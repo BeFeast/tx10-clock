@@ -14,12 +14,15 @@ import org.junit.Test;
 public class ClockConfigTest {
 
     @Test
-    public void defaultConfigIsOpaqueDarkTheme() {
+    public void defaultConfigMatchesAcceptedContract() {
         ClockConfig c = ClockConfig.defaultConfig();
-        assertEquals(0xFF0E1726, c.backgroundColor);
-        assertEquals(0xFF1B2A41, c.faceColor);
-        assertEquals(0xFF4FC3F7, c.secondHandColor);
-        assertTrue(c.use24Hour);
+        assertEquals(0xFF000000, c.backgroundColor);
+        assertEquals(0xFF000000, c.faceColor);
+        assertEquals(0xFFD1D1D6, c.tickColor);
+        assertEquals(0xFFFF9F0A, c.secondHandColor);
+        assertEquals(0xFFF5F5F7, c.digitalColor);
+        assertEquals(0xFFA1A1A6, c.dateColor);
+        assertFalse(c.use24Hour);
         assertTrue(c.showSeconds);
         // Every colour must be fully opaque so frames have no alpha bleed.
         for (int argb : new int[]{
@@ -32,11 +35,11 @@ public class ClockConfigTest {
     @Test
     public void builderOverridesApply() {
         ClockConfig c = new ClockConfig.Builder()
-                .use24Hour(false)
+                .use24Hour(true)
                 .showSeconds(false)
                 .backgroundColor(0xFF000000)
                 .build();
-        assertFalse(c.use24Hour);
+        assertTrue(c.use24Hour);
         assertFalse(c.showSeconds);
         assertEquals(0xFF000000, c.backgroundColor);
     }

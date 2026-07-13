@@ -27,10 +27,10 @@ public class ExternalConfigTest {
     // --- defaults & happy path ----------------------------------------------
 
     @Test
-    public void defaultsAreBootStartTrueAndSystemZone() {
+    public void defaultsAreBootStartTrueTwelveHourAndSystemZone() {
         ExternalConfig c = ExternalConfig.defaults();
         assertTrue(c.bootStart);
-        assertTrue(c.use24Hour);
+        assertFalse(c.use24Hour);
         assertTrue(c.showSeconds);
         assertNull(c.timeZone);
     }
@@ -56,7 +56,7 @@ public class ExternalConfigTest {
     public void partialDocumentMergesWithDefaults() throws Exception {
         ExternalConfig c = ExternalConfig.parse("{\"bootStart\":false}");
         assertFalse(c.bootStart);
-        assertTrue(c.use24Hour);   // default retained
+        assertFalse(c.use24Hour);  // 12-hour default retained
         assertTrue(c.showSeconds); // default retained
         assertNull(c.timeZone);
     }
