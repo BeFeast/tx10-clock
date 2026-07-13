@@ -16,8 +16,8 @@ import java.time.ZonedDateTime;
  */
 public final class ClockView extends View {
 
-    private final ClockRenderer renderer;
-    private final TimeSource timeSource;
+    private ClockRenderer renderer;
+    private TimeSource timeSource;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private boolean running;
@@ -38,6 +38,18 @@ public final class ClockView extends View {
         super(context, attrs);
         this.renderer = new ClockRenderer(ClockConfig.defaultConfig());
         this.timeSource = TimeSource.system();
+    }
+
+    /**
+     * Swap the renderer configuration and time source at runtime (e.g. after an
+     * external config reload). Only behavioural settings — 12/24-hour, seconds,
+     * time zone — flow in here; the visual theme itself is unchanged. Triggers a
+     * redraw so the change is visible immediately.
+     */
+    public void apply(ClockConfig config, TimeSource timeSource) {
+        this.renderer = new ClockRenderer(config);
+        this.timeSource = timeSource;
+        invalidate();
     }
 
     /** Begin the once-per-second redraw loop. Idempotent. */
