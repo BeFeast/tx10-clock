@@ -30,6 +30,11 @@
       "path": "build-tools;36.0.0",
       "revision": "36.0.0",
       "sha256": "112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00"
+    },
+    {
+      "path": "cmdline-tools;19.0",
+      "revision": "19.0",
+      "sha256": "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899"
     }
   ],
   "artifact": {

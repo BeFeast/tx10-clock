@@ -63,6 +63,9 @@ The build inputs are pinned for a reproducible release (single source of truth:
   with Command-line Tools build `14742923` (point Gradle at the SDK via
   `ANDROID_SDK_ROOT` or a `local.properties` `sdk.dir=` line —
   `local.properties` is intentionally untracked).
+- Strict dependency locking in [`app/gradle.lockfile`](app/gradle.lockfile) and
+  SHA-256 dependency verification in
+  [`gradle/verification-metadata.xml`](gradle/verification-metadata.xml).
 
 ## Build & test
 

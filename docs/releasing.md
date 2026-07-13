@@ -22,7 +22,8 @@ CI, and the release workflow all agree with that lock, enforced by
 | Android platform | 29 (compile/target/min = the TX10 runtime) |
 | SDK Build Tools | 36.0.0 (`app/build.gradle`, workflows) |
 | Command-line Tools | build `14742923` |
-| Dependencies | exact versions only — no dynamic selectors, no SNAPSHOTs, no `mavenLocal()` |
+| Dependencies | strict committed `app/gradle.lockfile` + SHA-256 `gradle/verification-metadata.xml`; no dynamic selectors, SNAPSHOTs, or `mavenLocal()` |
+| Signing resolver | Infisical CLI 0.43.96 + pinned archive SHA-256 |
 | GitHub Actions | every `uses:` pinned to a full commit SHA |
 
 ## Prerequisites (operator, one-time)
@@ -32,15 +33,16 @@ CI, and the release workflow all agree with that lock, enforced by
    the Android SDK licences accepted. Licence acceptance is never automated in
    this repo (`scripts/check-no-sdk-license-automation.sh` enforces that).
 2. **Signing material in a private store.** Put the signing keystore and its
-   passwords in Infisical (or Vaultwarden) — **never in git, never in GitHub
-   secrets directly**. GitHub holds only the machine-identity credentials that
-   let the runner read the store:
-   - Infisical: secrets `INFISICAL_CLIENT_ID`, `INFISICAL_CLIENT_SECRET`;
-     variables `INFISICAL_PROJECT`, `RELEASE_SIGNING_KEY_REFERENCE`
+   passwords in Infisical — **never in git, never in GitHub secrets directly**.
+   GitHub holds only the machine-identity credentials that let the runner read
+   the store: secrets `INFISICAL_CLIENT_ID`, `INFISICAL_CLIENT_SECRET`;
+     variables `INFISICAL_API_URL`, `INFISICAL_PROJECT`, `RELEASE_SIGNING_KEY_REFERENCE`
      (an `infisical://…` path). The store holds `TX10_RELEASE_KEYSTORE_B64`,
      `TX10_RELEASE_KEYSTORE_PASSWORD`, `TX10_RELEASE_KEY_ALIAS`,
      `TX10_RELEASE_KEY_PASSWORD`.
-   - Vaultwarden: a `vaultwarden://…` item reference and a `BW_SESSION`.
+   The resolver also supports `vaultwarden://…` on a private runner that
+   provides a pinned `bw` CLI and `BW_SESSION`; the committed GitHub-hosted
+   release workflow installs and uses the checksum-pinned Infisical CLI.
 3. **Documented signer.** Set variable `RELEASE_SIGNING_CERT_SHA256` to the
    expected signing-certificate SHA-256 fingerprint. The workflow refuses to
    sign with any other key and re-checks it after signing.

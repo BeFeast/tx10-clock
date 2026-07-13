@@ -32,6 +32,11 @@ SIGNED="$OUT/app-release-signed.apk"
 
 die() { echo "release-emit-evidence: $*" >&2; exit 1; }
 
+# Back the policy booleans below with a fail-closed proof of the committed
+# Gradle locks, verification metadata, workflow actions, and resolver pins.
+bash scripts/check-release-pins.sh >/dev/null \
+    || die "release pin/lock/verification proof failed"
+
 # Final, published artifact name (bare, no directories).
 APK_NAME="tx10-clock-${RELEASE_TAG}-release.apk"
 cp "$SIGNED" "$OUT/$APK_NAME"
@@ -65,9 +70,10 @@ pkg_revision() {
 
 PLATFORM_DIR="$ANDROID_SDK_ROOT/platforms/android-29"
 BT_DIR="$ANDROID_SDK_ROOT/build-tools/36.0.0"
-CT_DIR="$(ls -d "$ANDROID_SDK_ROOT"/cmdline-tools/*/ 2>/dev/null | grep -v latest | head -1 || true)"
+CT_DIR="$ANDROID_SDK_ROOT/cmdline-tools/latest"
 [ -d "$PLATFORM_DIR" ] || die "platform android-29 not installed"
 [ -d "$BT_DIR" ] || die "build-tools 36.0.0 not installed"
+[ -d "$CT_DIR" ] || die "command-line tools not installed under cmdline-tools/latest"
 
 # --- Assemble + validate the evidence document -------------------------------
 EVIDENCE="$OUT/release-evidence.json"
@@ -109,10 +115,9 @@ packages = [
     {"path": "build-tools;36.0.0", "revision": rev(bt_dir),
      "sha256": digest(bt_dir)},
 ]
-ct = os.environ.get("CT_DIR", "").rstrip("/")
-if ct and os.path.isdir(ct):
-    packages.append({"path": "cmdline-tools;%s" % rev(ct),
-                     "revision": rev(ct), "sha256": digest(ct)})
+ct = os.environ["CT_DIR"].rstrip("/")
+packages.append({"path": "cmdline-tools;%s" % rev(ct),
+                 "revision": rev(ct), "sha256": digest(ct)})
 
 byte_identical = os.environ["BYTE_IDENTICAL"] == "true"
 tag = os.environ["RELEASE_TAG"]

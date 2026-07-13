@@ -46,16 +46,18 @@ Every field is required at every level; unknown fields are rejected.
 
 - The `toolchain` values must equal the **pinned release toolchain** exactly
   (no dynamic or SNAPSHOT inputs); the policy flags must all hold.
-- `sdk_packages` must include the pinned `platforms;android-29` and
-  `build-tools;36.0.0` packages with resolved revisions and digests.
+- `sdk_packages` must include the pinned `platforms;android-29`,
+  `build-tools;36.0.0`, and `cmdline-tools;19.0` packages with resolved
+  revisions and digests.
 - `package.version_name` must equal `source.release_tag` without its `v`.
 - `native_libraries.present` must be `false` and `entries` empty.
 - `signing.apksigner_verified` must be `true` and `signing.apksigner_command`
   exactly `apksigner verify --print-certs -Werr`.
 - Byte reproducibility may be **claimed only after the comparison passes**:
-  `byte_identical: true` requires `compared: true`, all build digests equal, and
-  `artifact.sha256` equal to that digest. A comparison that ran but did not match
-  is recorded honestly (`compared: true`, `byte_identical: false`).
+  `byte_identical: true` requires `compared: true` and all unsigned build
+  digests equal. The separately signed release APK has its own independent
+  `artifact.sha256`. A comparison that ran but did not match is recorded
+  honestly (`compared: true`, `byte_identical: false`).
 
 Every string value is additionally screened against hygiene rules: local
 absolute paths, private/LAN endpoints, and credential material are rejected, and

@@ -44,20 +44,25 @@ put() {
 
 fetch_infisical() {
     command -v infisical >/dev/null 2>&1 || die "infisical CLI not found on runner"
-    : "${INFISICAL_CLIENT_ID:?}" "${INFISICAL_CLIENT_SECRET:?}" "${INFISICAL_PROJECT:?}"
+    : "${INFISICAL_UNIVERSAL_AUTH_CLIENT_ID:?}" \
+      "${INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET:?}" "${INFISICAL_PROJECT:?}"
     local token
-    token="$(infisical login --method=universal-auth \
-        --client-id="$INFISICAL_CLIENT_ID" \
-        --client-secret="$INFISICAL_CLIENT_SECRET" --silent --plain)" \
+    # Infisical reads Universal Auth credentials from env, so the client
+    # secret never appears in process arguments or logs.
+    token="$(infisical login --method=universal-auth --silent --plain)" \
         || die "infisical machine-identity login failed"
     mask "$token"
     local base path
     path="${SIGNING_KEY_REFERENCE#infisical://}"          # project/folder path
-    base=(infisical secrets get --token="$token" --projectId="$INFISICAL_PROJECT" --plain)
+    # Use the documented token environment variable. Neither the Universal
+    # Auth secret nor the short-lived access token enters process argv.
+    export INFISICAL_TOKEN="$token"
+    base=(infisical secrets get --projectId="$INFISICAL_PROJECT" --plain)
     KEYSTORE_B64="$("${base[@]}" "TX10_RELEASE_KEYSTORE_B64" --path="/$path")"
     KEYSTORE_PASSWORD="$("${base[@]}" "TX10_RELEASE_KEYSTORE_PASSWORD" --path="/$path")"
     KEY_ALIAS="$("${base[@]}" "TX10_RELEASE_KEY_ALIAS" --path="/$path")"
     KEY_PASSWORD="$("${base[@]}" "TX10_RELEASE_KEY_PASSWORD" --path="/$path")"
+    unset INFISICAL_TOKEN token
 }
 
 fetch_vaultwarden() {

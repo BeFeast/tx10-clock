@@ -381,16 +381,17 @@
     "required_apksigner_command": "apksigner verify --print-certs -Werr",
     "required_sdk_packages": [
       "platforms;android-29",
-      "build-tools;36.0.0"
+      "build-tools;36.0.0",
+      "cmdline-tools;19.0"
     ],
     "semantic_rules": [
       "toolchain.jdk_major, .android_gradle_plugin, .gradle, .gradle_distribution_sha256, .android_platform, .build_tools, and .command_line_tools must equal the pinned release toolchain",
       "toolchain.dependency_verification and .dependency_locking must be true; .allows_dynamic_versions and .allows_snapshot_dependencies must be false; .actions_fully_sha_pinned must be true",
-      "sdk_packages must include the pinned 'platforms;android-29' and 'build-tools;36.0.0' packages, each with a resolved revision and digest",
+      "sdk_packages must include the pinned 'platforms;android-29', 'build-tools;36.0.0', and 'cmdline-tools;19.0' packages, each with a resolved revision and digest",
       "package.version_name must equal source.release_tag without its leading 'v'",
       "native_libraries.present must be false and native_libraries.entries empty (the release APK carries no native code)",
       "signing.apksigner_verified must be true and signing.apksigner_command must be exactly 'apksigner verify --print-certs -Werr'",
-      "reproducibility.builds must record at least two builds; when reproducibility.byte_identical is true, .compared must be true, every build digest must be equal, and artifact.sha256 must equal that digest",
+      "reproducibility.builds must record at least two builds; when reproducibility.byte_identical is true, .compared must be true, every unsigned build digest must be equal; artifact.sha256 independently identifies the subsequently signed release APK",
       "reproducibility.byte_identical must be true whenever .compared is true and all build digests are equal (no unclaimed reproducibility)"
     ],
     "supported_schema_versions": [

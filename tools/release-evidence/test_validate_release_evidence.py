@@ -144,6 +144,35 @@ class PinnedToolchainMatchesBuildFiles(unittest.TestCase):
             text = fh.read()
         self.assertIn('buildToolsVersion "%s"' % ve.PINNED["build_tools"], text)
 
+    def test_strict_dependency_locking_is_committed(self):
+        with open(os.path.join(ROOT, "build.gradle"), "r", encoding="utf-8") as fh:
+            build = fh.read()
+        self.assertIn("lockAllConfigurations()", build)
+        self.assertIn("lockMode = LockMode.STRICT", build)
+        lockfile = os.path.join(ROOT, "app", "gradle.lockfile")
+        self.assertGreater(os.path.getsize(lockfile), 100)
+
+    def test_strict_checksum_verification_is_committed(self):
+        with open(os.path.join(ROOT, "gradle.properties"), "r", encoding="utf-8") as fh:
+            properties = fh.read()
+        self.assertIn("org.gradle.dependency.verification=strict", properties)
+        metadata = os.path.join(ROOT, "gradle", "verification-metadata.xml")
+        with open(metadata, "r", encoding="utf-8") as fh:
+            text = fh.read()
+        self.assertIn("<verify-metadata>true</verify-metadata>", text)
+        self.assertRegex(text, r'<sha256 value="[0-9a-f]{64}"')
+
+    def test_release_signing_inputs_and_secret_transport_are_pinned(self):
+        with open(os.path.join(ROOT, ".github", "workflows", "release.yml"), "r", encoding="utf-8") as fh:
+            workflow = fh.read()
+        self.assertIn(ve.SIGNING_RESOLVER["infisical_cli_version"], workflow)
+        self.assertIn(ve.SIGNING_RESOLVER["infisical_cli_linux_amd64_sha256"], workflow)
+        self.assertIn("sha256sum --check", workflow)
+        with open(os.path.join(ROOT, "scripts", "release-sign-and-verify.sh"), "r", encoding="utf-8") as fh:
+            signer = fh.read()
+        self.assertIn("-storepass:env RELEASE_KEYSTORE_PASSWORD", signer)
+        self.assertNotIn("-storepass \"$RELEASE_KEYSTORE_PASSWORD\"", signer)
+
 
 class ToolchainSemanticsTests(unittest.TestCase):
     def test_each_pin_mismatch_is_reported(self):
@@ -186,6 +215,11 @@ class OtherSemanticTests(unittest.TestCase):
         ]
         self.assertIn("state_invalid", codes(ve.validate_document(doc)))
 
+    def test_sdk_package_revision_must_be_resolved(self):
+        doc = valid_doc()
+        doc["sdk_packages"][0]["revision"] = "unknown"
+        self.assertIn("state_invalid", codes(ve.validate_document(doc)))
+
     def test_native_libraries_must_be_absent(self):
         doc = valid_doc()
         doc["native_libraries"]["present"] = True
@@ -215,10 +249,10 @@ class OtherSemanticTests(unittest.TestCase):
         # builds already share one digest -> must not claim non-identical
         self.assertIn("state_invalid", codes(ve.validate_document(doc)))
 
-    def test_artifact_digest_must_equal_reproduced_digest(self):
+    def test_signed_artifact_digest_is_independent_of_unsigned_reproducible_builds(self):
         doc = valid_doc()
         doc["artifact"]["sha256"] = "a" * 64
-        self.assertIn("state_invalid", codes(ve.validate_document(doc)))
+        self.assertEqual([], ve.validate_document(doc))
 
 
 class SigningReferenceTests(unittest.TestCase):

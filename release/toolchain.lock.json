@@ -17,8 +17,13 @@
   "required_apksigner_command": "apksigner verify --print-certs -Werr",
   "required_sdk_packages": [
     "platforms;android-29",
-    "build-tools;36.0.0"
+    "build-tools;36.0.0",
+    "cmdline-tools;19.0"
   ],
+  "signing_resolver": {
+    "infisical_cli_linux_amd64_sha256": "c89ac2b013f0f0219e8ab390a47266ef86da4fe43a2d0ae72e1acc9f66da9de4",
+    "infisical_cli_version": "0.43.96"
+  },
   "toolchain": {
     "android_gradle_plugin": "9.2.1",
     "android_platform": 29,

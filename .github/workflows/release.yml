@@ -32,13 +32,15 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write   # create the GitHub Release and upload assets
+  contents: read
 
 env:
   # Pinned release inputs (single source of truth: release/toolchain.lock.json).
   ANDROID_PLATFORM: '29'
   ANDROID_BUILD_TOOLS: '36.0.0'
   ANDROID_CMDLINE_TOOLS_BUILD: '14742923'
+  INFISICAL_CLI_VERSION: '0.43.96'
+  INFISICAL_CLI_LINUX_AMD64_SHA256: 'c89ac2b013f0f0219e8ab390a47266ef86da4fe43a2d0ae72e1acc9f66da9de4'
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -121,6 +123,8 @@ jobs:
     needs: reproducible-build
     if: ${{ vars.ANDROID_SDK_LICENSE_ACCEPTED == 'true' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the GitHub Release and upload assets
     steps:
       - name: Checkout the exact tagged commit
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -169,14 +173,28 @@ jobs:
             echo "::warning::Builds are not byte-identical (a=$a b=$b); reproducibility will be recorded as not-claimed."
           fi
 
+      - name: Install the pinned Infisical CLI
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/infisical.tar.gz"
+          curl --fail --location --silent --show-error \
+            "https://github.com/Infisical/cli/releases/download/v${INFISICAL_CLI_VERSION}/cli_${INFISICAL_CLI_VERSION}_linux_amd64.tar.gz" \
+            --output "$archive"
+          printf '%s  %s\n' "$INFISICAL_CLI_LINUX_AMD64_SHA256" "$archive" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/infisical-bin"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/infisical-bin" infisical
+          chmod 0755 "$RUNNER_TEMP/infisical-bin/infisical"
+          echo "$RUNNER_TEMP/infisical-bin" >> "$GITHUB_PATH"
+
       - name: Resolve signing material from the private stores (masked)
         env:
           # The ONLY release secrets held by GitHub are the machine-identity
           # credentials that let the runner read the private stores. The actual
           # keystore and passwords live in Infisical/Vaultwarden and are pulled
           # here into masked env, written only to $RUNNER_TEMP, never to git.
-          INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
-          INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          INFISICAL_UNIVERSAL_AUTH_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
+          INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          INFISICAL_API_URL: ${{ vars.INFISICAL_API_URL }}
           INFISICAL_PROJECT: ${{ vars.INFISICAL_PROJECT }}
           SIGNING_KEY_REFERENCE: ${{ vars.RELEASE_SIGNING_KEY_REFERENCE }}
         run: bash scripts/release-resolve-signing.sh

@@ -73,8 +73,19 @@ LOCK_BUILD_FILES = {
     "gradle_distribution_zip": "gradle-9.4.1-bin.zip",
 }
 
+SIGNING_RESOLVER = {
+    "infisical_cli_version": "0.43.96",
+    "infisical_cli_linux_amd64_sha256": (
+        "c89ac2b013f0f0219e8ab390a47266ef86da4fe43a2d0ae72e1acc9f66da9de4"
+    ),
+}
+
 REQUIRED_APKSIGNER_COMMAND = "apksigner verify --print-certs -Werr"
-REQUIRED_SDK_PACKAGE_PATHS = ("platforms;android-29", "build-tools;36.0.0")
+REQUIRED_SDK_PACKAGE_PATHS = (
+    "platforms;android-29",
+    "build-tools;36.0.0",
+    "cmdline-tools;19.0",
+)
 
 # --- Field formats -----------------------------------------------------------
 
@@ -129,8 +140,9 @@ SEMANTIC_RULES = (
     "toolchain.dependency_verification and .dependency_locking must be true; "
     ".allows_dynamic_versions and .allows_snapshot_dependencies must be false; "
     ".actions_fully_sha_pinned must be true",
-    "sdk_packages must include the pinned 'platforms;android-29' and "
-    "'build-tools;36.0.0' packages, each with a resolved revision and digest",
+    "sdk_packages must include the pinned 'platforms;android-29', "
+    "'build-tools;36.0.0', and 'cmdline-tools;19.0' packages, each with a "
+    "resolved revision and digest",
     "package.version_name must equal source.release_tag without its leading 'v'",
     "native_libraries.present must be false and native_libraries.entries empty "
     "(the release APK carries no native code)",
@@ -138,7 +150,8 @@ SEMANTIC_RULES = (
     "be exactly 'apksigner verify --print-certs -Werr'",
     "reproducibility.builds must record at least two builds; when "
     "reproducibility.byte_identical is true, .compared must be true, every "
-    "build digest must be equal, and artifact.sha256 must equal that digest",
+    "unsigned build digest must be equal; artifact.sha256 independently "
+    "identifies the subsequently signed release APK",
     "reproducibility.byte_identical must be true whenever .compared is true and "
     "all build digests are equal (no unclaimed reproducibility)",
 )
@@ -524,6 +537,15 @@ def _check_sdk_packages(packages, errors):
                     "resolved SDK packages must include '%s'" % required,
                 )
             )
+    for index, package in enumerate(packages):
+        if package["revision"] == "unknown":
+            errors.append(
+                _error(
+                    "state_invalid",
+                    "$.sdk_packages[%d].revision" % index,
+                    "SDK package revision must be resolved",
+                )
+            )
 
 
 def _check_version(doc, errors):
@@ -597,15 +619,6 @@ def _check_reproducibility(doc, errors):
                     "state_invalid",
                     "$.reproducibility.builds",
                     "byte_identical requires every build digest to be equal",
-                )
-            )
-        elif doc["artifact"]["sha256"] not in digests:
-            errors.append(
-                _error(
-                    "state_invalid",
-                    "$.artifact.sha256",
-                    "byte_identical requires artifact.sha256 to equal the "
-                    "reproduced build digest",
                 )
             )
     elif repro["compared"] and all_equal:
@@ -783,6 +796,7 @@ def emit_lock():
         ),
         "toolchain": dict(PINNED),
         "build_files": dict(LOCK_BUILD_FILES),
+        "signing_resolver": dict(SIGNING_RESOLVER),
         "policy": {
             "dependency_verification": True,
             "dependency_locking": True,

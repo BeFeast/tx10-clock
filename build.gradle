@@ -8,3 +8,12 @@
 plugins {
     id 'com.android.application' version '9.2.1' apply false
 }
+
+// Every resolvable configuration is locked. STRICT makes a missing or stale
+// lock state a build failure instead of silently resolving a new graph.
+allprojects {
+    dependencyLocking {
+        lockAllConfigurations()
+        lockMode = LockMode.STRICT
+    }
+}

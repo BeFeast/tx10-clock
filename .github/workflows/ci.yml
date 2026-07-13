@@ -83,6 +83,7 @@ jobs:
           # License acceptance is a human gate, not a CI side effect. The
           # operator-gated runner image must already provide accepted licenses.
           accept-android-sdk-licenses: false
+          cmdline-tools-version: '14742923'
           # Pinned release inputs (release/toolchain.lock.json): compile against
           # platform 29 with Build Tools 36.0.0 (AGP 9.2.1 requires 36.0.0).
           packages: 'platform-tools platforms;android-29 build-tools;36.0.0'

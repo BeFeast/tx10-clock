@@ -42,7 +42,7 @@ EXPECTED="$(norm "$EXPECTED_CERT_SHA256")"
 KEYTOOL_OUT="$(keytool -list -v \
     -keystore "$RELEASE_KEYSTORE_PATH" \
     -alias "$RELEASE_KEY_ALIAS" \
-    -storepass "$RELEASE_KEYSTORE_PASSWORD" 2>/dev/null)" \
+    -storepass:env RELEASE_KEYSTORE_PASSWORD 2>/dev/null)" \
     || die "cannot read keystore certificate (alias/password?)"
 KEYSTORE_SHA="$(norm "$(printf '%s\n' "$KEYTOOL_OUT" \
     | sed -n 's/.*SHA-*256: *//p' | head -1)")"
