@@ -20,9 +20,16 @@ public final class ClockRenderer {
     private static final float ANALOG_Y = 338f;
     private static final float DIGITAL_LEFT = 666f;
     private static final float DIGITAL_RIGHT = 1214f;
+    private static final float DIGITAL_GROUP_SCALE = 1.025f;
+    private static final float DIGITAL_GROUP_PIVOT_X = (DIGITAL_LEFT + DIGITAL_RIGHT) / 2f;
+    private static final float DIGITAL_GROUP_PIVOT_Y = 350f;
     private static final float CALENDAR_TOP = 357f;
     private static final int CALENDAR_MUTED = 0xFF636366;
+    private static final int CALENDAR_ADJACENT = 0xFF48484A;
     private static final int CALENDAR_CARD = 0xFF17120A;
+    static final int CALENDAR_ROLE_ADJACENT = 0;
+    static final int CALENDAR_ROLE_CURRENT_MONTH = 1;
+    static final int CALENDAR_ROLE_TODAY = 2;
     private static final String[] WEEKDAY_INITIALS = {"S", "M", "T", "W", "T", "F", "S"};
     private static final DateTimeFormatter MONTH_YEAR =
             DateTimeFormatter.ofPattern("MMMM uuuu", Locale.US);
@@ -64,7 +71,11 @@ public final class ClockRenderer {
         drawNumerals(canvas);
         drawHands(canvas, now);
         drawHub(canvas);
+        int digitalSave = canvas.save();
+        canvas.scale(DIGITAL_GROUP_SCALE, DIGITAL_GROUP_SCALE,
+                DIGITAL_GROUP_PIVOT_X, DIGITAL_GROUP_PIVOT_Y);
         drawDigital(canvas, now);
+        canvas.restoreToCount(digitalSave);
         canvas.restoreToCount(save);
     }
 
@@ -201,10 +212,7 @@ public final class ClockRenderer {
 
         final float contentTop = 408f;
         YearMonth month = YearMonth.from(now);
-        int firstColumn = LocalDate.of(month.getYear(), month.getMonth(), 1)
-                .getDayOfWeek().getValue() % 7;
-        int rowCount = (firstColumn + month.lengthOfMonth() + 6) / 7;
-        final float contentBottom = contentTop + 21f + rowCount * 20f;
+        final float contentBottom = contentTop + 21f + 6f * 20f;
         final float cardRight = 778f;
         RectF card = new RectF(DIGITAL_LEFT, contentTop, cardRight, contentBottom);
         fill.setColor(CALENDAR_CARD);
@@ -219,12 +227,10 @@ public final class ClockRenderer {
         configureCalendarText(48f, false, config.secondHandColor, 0f, Paint.Align.CENTER);
         canvas.drawText(Integer.toString(now.getDayOfMonth()), cardCenter, 502f, text);
 
-        drawMiniMonth(canvas, now, month, firstColumn,
-                800f, contentTop, DIGITAL_RIGHT - 800f);
+        drawMiniMonth(canvas, now, month, 800f, contentTop, DIGITAL_RIGHT - 800f);
     }
 
     private void drawMiniMonth(Canvas canvas, ZonedDateTime now, YearMonth month,
-                               int firstColumn,
                                float left, float top, float width) {
         float columnWidth = width / 7f;
         configureCalendarText(11f, true, CALENDAR_MUTED, 1f, Paint.Align.CENTER);
@@ -233,24 +239,48 @@ public final class ClockRenderer {
                     left + columnWidth * (column + 0.5f), top + 13f, text);
         }
 
-        int days = month.lengthOfMonth();
         float firstRowTop = top + 21f;
-        for (int day = 1; day <= days; day++) {
-            int cell = firstColumn + day - 1;
+        LocalDate[] dates = calendarDates(month);
+        LocalDate todayDate = now.toLocalDate();
+        for (int cell = 0; cell < dates.length; cell++) {
+            LocalDate date = dates[cell];
             int column = cell % 7;
             int row = cell / 7;
             float centerX = left + columnWidth * (column + 0.5f);
             float centerY = firstRowTop + row * 20f + 10f;
-            boolean today = day == now.getDayOfMonth();
-            if (today) {
+            int role = calendarCellRole(date, month, todayDate);
+            if (role == CALENDAR_ROLE_TODAY) {
                 fill.setColor(config.secondHandColor);
                 canvas.drawCircle(centerX, centerY, 10.5f, fill);
             }
-            configureCalendarText(14f, today, today ? config.backgroundColor : config.dateColor,
+            int color = role == CALENDAR_ROLE_TODAY
+                    ? config.backgroundColor
+                    : role == CALENDAR_ROLE_ADJACENT ? CALENDAR_ADJACENT : config.dateColor;
+            configureCalendarText(14f, role == CALENDAR_ROLE_TODAY, color,
                     0f, Paint.Align.CENTER);
-            canvas.drawText(Integer.toString(day), centerX,
+            canvas.drawText(Integer.toString(date.getDayOfMonth()), centerX,
                     centeredBaseline(centerY, text), text);
         }
+    }
+
+    /** Return the stable Sunday-first 7x6 date matrix for a displayed month. */
+    static LocalDate[] calendarDates(YearMonth month) {
+        LocalDate first = month.atDay(1);
+        int leadingDays = first.getDayOfWeek().getValue() % 7;
+        LocalDate gridStart = first.minusDays(leadingDays);
+        LocalDate[] dates = new LocalDate[42];
+        for (int cell = 0; cell < dates.length; cell++) {
+            dates[cell] = gridStart.plusDays(cell);
+        }
+        return dates;
+    }
+
+    /** Adjacent-month cells are always muted and can never receive today's accent. */
+    static int calendarCellRole(LocalDate date, YearMonth displayedMonth, LocalDate today) {
+        if (!YearMonth.from(date).equals(displayedMonth)) {
+            return CALENDAR_ROLE_ADJACENT;
+        }
+        return date.equals(today) ? CALENDAR_ROLE_TODAY : CALENDAR_ROLE_CURRENT_MONTH;
     }
 
     private void configureCalendarText(float size, boolean bold, int color,

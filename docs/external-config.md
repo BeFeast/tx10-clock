@@ -73,7 +73,7 @@ keys take their default. All fields are validated strictly (see below).
 | `dateColor`            | string  | `"grey"`       | Approved name for time metadata and calendar text. |
 | `tickColor`            | string  | `"silver"`     | Approved name for the minor tick marks. |
 | `accentColor`          | string  | `"orange"`     | Approved name for the second hand and digital seconds. |
-| `showDate`             | boolean | `true`         | Draw the hybrid month calendar below the digital clock; when `false` the calendar is hidden while seconds and AM/PM stay visible. |
+| `showDate`             | boolean | `true`         | Draw the hybrid month calendar below the digital clock as a Sunday-first 7×6 matrix; leading/trailing dates come from adjacent months in subdued grey. When `false`, the calendar is hidden while seconds and AM/PM stay visible. |
 | `digitalSizePercent`   | integer | `100`          | Main digital line size, `50`–`100` percent of the design size; shrinks the whole line uniformly about its anchor. |
 | `secondarySizePercent` | integer | `100`          | Seconds and AM/PM size, `50`–`100` percent of the design size. |
 | `burnInEnabled`        | boolean | `true`         | Run the per-minute whole-composition burn-in shift. |
