@@ -7,7 +7,7 @@ import org.junit.Test;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
-/** Deterministic text fixtures from visual contract v0.1.0. */
+/** Deterministic time and calendar text fixtures. */
 public class ClockFormatTest {
 
     private static final ZonedDateTime REFERENCE = ZonedDateTime.of(

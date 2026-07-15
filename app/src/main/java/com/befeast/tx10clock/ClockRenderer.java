@@ -2,18 +2,39 @@ package com.befeast.tx10clock;
 
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
-/** Native Canvas implementation of visual contract v0.1.0. */
+/** Native Canvas implementation of the accepted clock + hybrid-calendar composition. */
 public final class ClockRenderer {
 
     private static final float DESIGN_WIDTH = 1280f;
     private static final float DESIGN_HEIGHT = 720f;
     private static final float ANALOG_X = 318f;
-    private static final float ANALOG_Y = 360f;
-    private static final float DIGITAL_X = 941f;
+    private static final float ANALOG_Y = 338f;
+    private static final float DIGITAL_LEFT = 666f;
+    private static final float DIGITAL_RIGHT = 1214f;
+    private static final float DIGITAL_GROUP_SCALE = 1.025f;
+    private static final float DIGITAL_GROUP_PIVOT_X = (DIGITAL_LEFT + DIGITAL_RIGHT) / 2f;
+    private static final float DIGITAL_GROUP_PIVOT_Y = 350f;
+    private static final float CALENDAR_TOP = 357f;
+    private static final int CALENDAR_MUTED = 0xFF636366;
+    private static final int CALENDAR_ADJACENT = 0xFF48484A;
+    private static final int CALENDAR_CARD = 0xFF17120A;
+    static final int CALENDAR_ROLE_ADJACENT = 0;
+    static final int CALENDAR_ROLE_CURRENT_MONTH = 1;
+    static final int CALENDAR_ROLE_TODAY = 2;
+    private static final String[] WEEKDAY_INITIALS = {"S", "M", "T", "W", "T", "F", "S"};
+    private static final DateTimeFormatter MONTH_YEAR =
+            DateTimeFormatter.ofPattern("MMMM uuuu", Locale.US);
+    private static final DateTimeFormatter WEEKDAY =
+            DateTimeFormatter.ofPattern("EEEE", Locale.US);
 
     private final ClockConfig config;
     private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -50,7 +71,11 @@ public final class ClockRenderer {
         drawNumerals(canvas);
         drawHands(canvas, now);
         drawHub(canvas);
+        int digitalSave = canvas.save();
+        canvas.scale(DIGITAL_GROUP_SCALE, DIGITAL_GROUP_SCALE,
+                DIGITAL_GROUP_PIVOT_X, DIGITAL_GROUP_PIVOT_Y);
         drawDigital(canvas, now);
+        canvas.restoreToCount(digitalSave);
         canvas.restoreToCount(save);
     }
 
@@ -125,38 +150,30 @@ public final class ClockRenderer {
     private void drawHub(Canvas canvas) {
         fill.setColor(config.secondHandColor);
         canvas.drawCircle(ANALOG_X, ANALOG_Y, 11f, fill);
-        fill.setColor(config.backgroundColor);
+        fill.setColor(config.digitalColor);
         canvas.drawCircle(ANALOG_X, ANALOG_Y, 4f, fill);
     }
 
     private void drawDigital(Canvas canvas, ZonedDateTime now) {
         String main = ClockFormat.main(now, config.use24Hour);
         configureMainText();
-        float referenceWidth = text.measureText(config.use24Hour ? "22:09" : "10:09");
-        if (referenceWidth > 0f) {
-            text.setTextScaleX(535f * sizeScale(config.digitalSizePercent) / referenceWidth);
-        }
-        text.setTextAlign(Paint.Align.CENTER);
-        canvas.drawText(main, DIGITAL_X, 377f, text);
-
-        String prefix = ClockFormat.secondaryPrefix(now, config.use24Hour, config.showDate);
-        String seconds = config.showSeconds ? ClockFormat.seconds(now) : "";
-        configureSecondaryText();
-        float naturalWidth = text.measureText(prefix) + text.measureText(seconds);
-        float targetWidth = (config.use24Hour ? 495f : 535f) * sizeScale(config.secondarySizePercent);
-        if (naturalWidth > 0f) {
-            text.setTextScaleX(targetWidth / naturalWidth);
-        }
-
-        float prefixWidth = text.measureText(prefix);
-        float secondsWidth = text.measureText(seconds);
-        float startX = DIGITAL_X - (prefixWidth + secondsWidth) / 2f;
         text.setTextAlign(Paint.Align.LEFT);
-        text.setColor(config.dateColor);
-        canvas.drawText(prefix, startX, 447f, text);
-        if (!seconds.isEmpty()) {
+        canvas.drawText(main, DIGITAL_LEFT, 311f, text);
+
+        float metaX = DIGITAL_LEFT + text.measureText(main) + 16f;
+        configureMetaText();
+        text.setTextAlign(Paint.Align.LEFT);
+        if (config.showSeconds) {
             text.setColor(config.secondHandColor);
-            canvas.drawText(seconds, startX + prefixWidth, 447f, text);
+            canvas.drawText(ClockFormat.seconds(now), metaX, 188f, text);
+        }
+        if (!config.use24Hour) {
+            text.setColor(config.dateColor);
+            canvas.drawText(ClockFormat.amPm(now), metaX, 309f, text);
+        }
+
+        if (config.showDate) {
+            drawHybridCalendar(canvas, now);
         }
 
         text.setTextScaleX(1f);
@@ -168,28 +185,126 @@ public final class ClockRenderer {
         text.setColor(config.digitalColor);
         text.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
         text.setFakeBoldText(false);
-        text.setTextSize(190f * sizeScale(config.digitalSizePercent));
+        text.setTextSize(182f * sizeScale(config.digitalSizePercent));
         text.setTextScaleX(1f);
-        // Letter spacing is expressed in em units, so it tracks the size scale.
-        text.setLetterSpacing(-7f / 190f);
+        text.setLetterSpacing(-8f / 182f);
     }
 
-    private void configureSecondaryText() {
+    private void configureMetaText() {
         text.setColor(config.dateColor);
         text.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         text.setFakeBoldText(false);
-        text.setTextSize(38f * sizeScale(config.secondarySizePercent));
+        text.setTextSize(36f * sizeScale(config.secondarySizePercent));
         text.setTextScaleX(1f);
-        // Letter spacing is expressed in em units, so it tracks the size scale.
-        text.setLetterSpacing(2f / 38f);
+        text.setLetterSpacing(2f / 36f);
+    }
+
+    private void drawHybridCalendar(Canvas canvas, ZonedDateTime now) {
+        stroke.setColor(0xFF2C2C2E);
+        stroke.setAlpha(255);
+        stroke.setStrokeWidth(1f);
+        canvas.drawLine(DIGITAL_LEFT, CALENDAR_TOP, DIGITAL_RIGHT, CALENDAR_TOP, stroke);
+
+        configureCalendarText(17f, true, config.digitalColor, 3f, Paint.Align.LEFT);
+        canvas.drawText(now.format(MONTH_YEAR).toUpperCase(Locale.US),
+                DIGITAL_LEFT, 391f, text);
+
+        configureCalendarText(12f, true, CALENDAR_MUTED, 2f, Paint.Align.RIGHT);
+        canvas.drawText("DAY " + now.getDayOfYear(), DIGITAL_RIGHT, 391f, text);
+
+        final float contentTop = 408f;
+        YearMonth month = YearMonth.from(now);
+        final float contentBottom = contentTop + 21f + 6f * 20f;
+        final float cardRight = 778f;
+        RectF card = new RectF(DIGITAL_LEFT, contentTop, cardRight, contentBottom);
+        fill.setColor(CALENDAR_CARD);
+        canvas.drawRoundRect(card, 14f, 14f, fill);
+        stroke.setColor(config.secondHandColor);
+        stroke.setStrokeWidth(1f);
+        canvas.drawRoundRect(card, 14f, 14f, stroke);
+
+        float cardCenter = (DIGITAL_LEFT + cardRight) / 2f;
+        configureCalendarText(9f, true, config.secondHandColor, 1.4f, Paint.Align.CENTER);
+        canvas.drawText(now.format(WEEKDAY).toUpperCase(Locale.US), cardCenter, 451f, text);
+        configureCalendarText(48f, false, config.secondHandColor, 0f, Paint.Align.CENTER);
+        canvas.drawText(Integer.toString(now.getDayOfMonth()), cardCenter, 502f, text);
+
+        drawMiniMonth(canvas, now, month, 800f, contentTop, DIGITAL_RIGHT - 800f);
+    }
+
+    private void drawMiniMonth(Canvas canvas, ZonedDateTime now, YearMonth month,
+                               float left, float top, float width) {
+        float columnWidth = width / 7f;
+        configureCalendarText(11f, true, CALENDAR_MUTED, 1f, Paint.Align.CENTER);
+        for (int column = 0; column < 7; column++) {
+            canvas.drawText(WEEKDAY_INITIALS[column],
+                    left + columnWidth * (column + 0.5f), top + 13f, text);
+        }
+
+        float firstRowTop = top + 21f;
+        LocalDate[] dates = calendarDates(month);
+        LocalDate todayDate = now.toLocalDate();
+        for (int cell = 0; cell < dates.length; cell++) {
+            LocalDate date = dates[cell];
+            int column = cell % 7;
+            int row = cell / 7;
+            float centerX = left + columnWidth * (column + 0.5f);
+            float centerY = firstRowTop + row * 20f + 10f;
+            int role = calendarCellRole(date, month, todayDate);
+            if (role == CALENDAR_ROLE_TODAY) {
+                fill.setColor(config.secondHandColor);
+                canvas.drawCircle(centerX, centerY, 10.5f, fill);
+            }
+            int color = role == CALENDAR_ROLE_TODAY
+                    ? config.backgroundColor
+                    : role == CALENDAR_ROLE_ADJACENT ? CALENDAR_ADJACENT : config.dateColor;
+            configureCalendarText(14f, role == CALENDAR_ROLE_TODAY, color,
+                    0f, Paint.Align.CENTER);
+            canvas.drawText(Integer.toString(date.getDayOfMonth()), centerX,
+                    centeredBaseline(centerY, text), text);
+        }
+    }
+
+    /** Return the stable Sunday-first 7x6 date matrix for a displayed month. */
+    static LocalDate[] calendarDates(YearMonth month) {
+        LocalDate first = month.atDay(1);
+        int leadingDays = first.getDayOfWeek().getValue() % 7;
+        LocalDate gridStart = first.minusDays(leadingDays);
+        LocalDate[] dates = new LocalDate[42];
+        for (int cell = 0; cell < dates.length; cell++) {
+            dates[cell] = gridStart.plusDays(cell);
+        }
+        return dates;
+    }
+
+    /** Adjacent-month cells are always muted and can never receive today's accent. */
+    static int calendarCellRole(LocalDate date, YearMonth displayedMonth, LocalDate today) {
+        if (!YearMonth.from(date).equals(displayedMonth)) {
+            return CALENDAR_ROLE_ADJACENT;
+        }
+        return date.equals(today) ? CALENDAR_ROLE_TODAY : CALENDAR_ROLE_CURRENT_MONTH;
+    }
+
+    private void configureCalendarText(float size, boolean bold, int color,
+                                       float letterSpacingPx, Paint.Align align) {
+        text.setColor(color);
+        text.setTypeface(Typeface.create("sans-serif",
+                bold ? Typeface.BOLD : Typeface.NORMAL));
+        text.setFakeBoldText(false);
+        text.setTextSize(size);
+        text.setTextScaleX(1f);
+        text.setLetterSpacing(size == 0f ? 0f : letterSpacingPx / size);
+        text.setTextAlign(align);
+    }
+
+    private static float centeredBaseline(float centerY, Paint paint) {
+        Paint.FontMetrics metrics = paint.getFontMetrics();
+        return centerY - (metrics.ascent + metrics.descent) / 2f;
     }
 
     /**
-     * The multiplier for a bounded (50..100) size percentage. Both the text
-     * size and the width the line is fitted into are scaled by this factor, so
-     * a smaller percentage shrinks the whole line uniformly about its layout
-     * anchor rather than distorting its glyphs. The default 100 yields 1.0, so
-     * the accepted contract sizes are unchanged.
+     * The multiplier for a bounded (50..100) text-size percentage. The default
+     * 100 yields 1.0, preserving the accepted design size.
      */
     private static float sizeScale(int percent) {
         return percent / 100f;

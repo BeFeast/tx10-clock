@@ -61,7 +61,13 @@ resolve_sdk
 export ANDROID_SDK_ROOT
 log "Android SDK: $ANDROID_SDK_ROOT"
 
-GRADLE="./gradlew --no-daemon --console=plain"
+PINNED_BUILD_TOOLS="$(python3 -c \
+    'import json; print(json.load(open("release/toolchain.lock.json"))["toolchain"]["build_tools"])')"
+[ -n "$PINNED_BUILD_TOOLS" ] || die "build-tools pin missing from release/toolchain.lock.json"
+AAPT2_OVERRIDE="$ANDROID_SDK_ROOT/build-tools/$PINNED_BUILD_TOOLS/aapt2"
+[ -x "$AAPT2_OVERRIDE" ] \
+    || die "pinned aapt2 not found at $AAPT2_OVERRIDE"
+GRADLE="./gradlew --no-daemon --console=plain -Pandroid.aapt2FromMavenOverride=$AAPT2_OVERRIDE"
 
 # --- 1..3  clean build + static + unit/golden --------------------------------
 log "Clean build, Android Lint, and unit/static/golden checks"

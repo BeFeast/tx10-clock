@@ -4,7 +4,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
-/** Pure formatting for the two-line digital clock contract. */
+/** Pure formatting for the digital time, metadata, and calendar labels. */
 public final class ClockFormat {
 
     private static final DateTimeFormatter MAIN_24 =
@@ -39,16 +39,17 @@ public final class ClockFormat {
         return now.format(SECONDS);
     }
 
-    /** Grey portion of the second line; orange seconds are drawn separately. */
+    /** Legacy compact-line helper retained for compatibility with existing callers. */
     public static String secondaryPrefix(ZonedDateTime now, boolean use24Hour) {
         return secondaryPrefix(now, use24Hour, true);
     }
 
     /**
-     * Grey portion of the second line, honouring the compact-date toggle. When
+     * Legacy compact-line fixture, honouring the compact-date toggle. When
      * {@code showDate} is false the date is dropped, leaving the 12-hour AM/PM
      * marker on its own (and nothing at all in 24-hour form). The orange seconds
-     * field is drawn separately by the renderer.
+     * field is appended separately. The current renderer draws the fields in a
+     * side metadata column and uses {@code showDate} for the hybrid calendar.
      */
     public static String secondaryPrefix(ZonedDateTime now, boolean use24Hour,
                                          boolean showDate) {
@@ -62,7 +63,7 @@ public final class ClockFormat {
         return sb.toString();
     }
 
-    /** Exact second-line fixture useful outside the renderer. */
+    /** Legacy exact compact-line fixture useful outside the renderer. */
     public static String secondary(ZonedDateTime now, boolean use24Hour,
                                    boolean showSeconds) {
         return secondary(now, use24Hour, showSeconds, true);

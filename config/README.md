@@ -32,7 +32,7 @@ and unknown fields are rejected.
 | — | `schemaVersion` | string | Must be `"1.0.0"`. |
 | `clock` | `hourCycle` | enum | `"h12"` or `"h24"` (12-/24-hour readout). |
 | `clock` | `showSeconds` | boolean | Show the seconds field / second hand. |
-| `clock` | `showDate` | boolean | Show the digital date line. |
+| `clock` | `showDate` | boolean | Show the Sunday-first 7×6 hybrid calendar, including muted adjacent-month dates, below the digital clock. |
 | `clock` | `analogSweep` | enum | `"smooth"` sweep or `"tick"`. |
 | `locale` | `policy` | enum | `"device"` or `"fixed"`. |
 | `locale` | `tag` | string \| null | BCP-47 tag; set exactly when policy is `fixed`. |

@@ -18,7 +18,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 
 /**
- * Proves the renderer actually consumes the compact-date toggle by recording
+ * Proves the renderer actually consumes the calendar toggle by recording
  * the text it draws. Uses the legacy shadow canvas, which captures each
  * {@code drawText} call, so the assertion is on drawn content rather than
  * pixel geometry.
@@ -28,7 +28,7 @@ import java.time.ZonedDateTime;
 @GraphicsMode(GraphicsMode.Mode.LEGACY)
 public class ClockRendererDrawTextTest {
 
-    // 2026-07-12 22:09:42 UTC renders as "10:09" / "PM SUN, JUL 12 42".
+    // 2026-07-12 22:09:42 UTC renders 10:09 with 42/PM metadata and the July calendar.
     private static final ZonedDateTime FIXED_TIME =
             ZonedDateTime.of(2026, 7, 12, 22, 9, 42, 0, ZoneOffset.UTC);
 
@@ -46,10 +46,12 @@ public class ClockRendererDrawTextTest {
     }
 
     @Test
-    public void defaultConfigDrawsTheCompactDate() {
+    public void defaultConfigDrawsTheHybridCalendarAndTimeMetadata() {
         String drawn = drawnText(ClockConfig.defaultConfig());
-        assertTrue("month token drawn by default", drawn.contains("JUL"));
-        assertTrue("weekday token drawn by default", drawn.contains("SUN"));
+        assertTrue("month header drawn by default", drawn.contains("JULY 2026"));
+        assertTrue("weekday card drawn by default", drawn.contains("SUNDAY"));
+        assertTrue("seconds drawn at upper right", drawn.contains("42"));
+        assertTrue("period drawn at lower right", drawn.contains("PM"));
     }
 
     @Test
@@ -57,9 +59,32 @@ public class ClockRendererDrawTextTest {
         ClockConfig hidden = ClockConfig.defaultConfig().toBuilder()
                 .showDate(false).build();
         String drawn = drawnText(hidden);
-        assertFalse("no month token when showDate is false", drawn.contains("JUL"));
-        assertFalse("no weekday token when showDate is false", drawn.contains("SUN"));
-        // The main time line is unaffected by the date toggle.
+        assertFalse("no month header when showDate is false", drawn.contains("JULY 2026"));
+        assertFalse("no weekday card when showDate is false", drawn.contains("SUNDAY"));
+        // The time lockup is unaffected by the calendar toggle.
         assertTrue("time line still drawn", drawn.contains("10:09"));
+        assertTrue("seconds still drawn", drawn.contains("42"));
+        assertTrue("period still drawn", drawn.contains("PM"));
+    }
+
+    @Test
+    public void showSecondsFalseHidesOnlySeconds() {
+        ClockConfig hidden = ClockConfig.defaultConfig().toBuilder()
+                .showSeconds(false).build();
+        String drawn = drawnText(hidden);
+        assertFalse("seconds hidden", drawn.contains("42"));
+        assertTrue("period remains", drawn.contains("PM"));
+        assertTrue("calendar remains", drawn.contains("JULY 2026"));
+    }
+
+    @Test
+    public void twentyFourHourModeHasSecondsButNoPeriod() {
+        ClockConfig twentyFourHour = ClockConfig.defaultConfig().toBuilder()
+                .use24Hour(true).build();
+        String drawn = drawnText(twentyFourHour);
+        assertTrue("24-hour main time drawn", drawn.contains("22:09"));
+        assertTrue("seconds remain", drawn.contains("42"));
+        assertFalse("period omitted in 24-hour mode", drawn.contains("PM"));
+        assertTrue("calendar remains", drawn.contains("JULY 2026"));
     }
 }

@@ -70,12 +70,12 @@ keys take their default. All fields are validated strictly (see below).
 | `showSeconds`          | boolean | `true`         | Show the second hand and seconds field. |
 | `timeZone`             | string  | *(device zone)*| IANA id, e.g. `America/New_York`; omit to follow the device. |
 | `digitalColor`         | string  | `"white"`      | Approved name for the digital time, hands, and numerals. |
-| `dateColor`            | string  | `"grey"`       | Approved name for the compact date. |
+| `dateColor`            | string  | `"grey"`       | Approved name for time metadata and calendar text. |
 | `tickColor`            | string  | `"silver"`     | Approved name for the minor tick marks. |
 | `accentColor`          | string  | `"orange"`     | Approved name for the second hand and digital seconds. |
-| `showDate`             | boolean | `true`         | Draw the compact English date (e.g. `SUN, JUL 12`) on the secondary line; when `false` the date is dropped (the 12-hour AM/PM marker stays). |
+| `showDate`             | boolean | `true`         | Draw the hybrid month calendar below the digital clock as a Sunday-first 7×6 matrix; leading/trailing dates come from adjacent months in subdued grey. When `false`, the calendar is hidden while seconds and AM/PM stay visible. |
 | `digitalSizePercent`   | integer | `100`          | Main digital line size, `50`–`100` percent of the design size; shrinks the whole line uniformly about its anchor. |
-| `secondarySizePercent` | integer | `100`          | Secondary line size, `50`–`100` percent of the design size; shrinks the whole line uniformly about its anchor. |
+| `secondarySizePercent` | integer | `100`          | Seconds and AM/PM size, `50`–`100` percent of the design size. |
 | `burnInEnabled`        | boolean | `true`         | Run the per-minute whole-composition burn-in shift. |
 | `burnInMaxShiftPx`     | integer | `8`            | Maximum shift amplitude, `0`–`8` design pixels; each axis is clamped to this, and `0` holds the composition still even when enabled. |
 

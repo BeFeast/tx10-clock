@@ -41,25 +41,24 @@ public class ClockRendererConfigTest {
     public void smallerDigitalSizePaintsLessMainInk() {
         ClockConfig full = ClockConfig.defaultConfig();
         ClockConfig half = full.toBuilder().digitalSizePercent(50).build();
-        // Main digital line band only (baseline ~377, size 190), right of the
-        // analog dial and above the secondary line.
-        int fullInk = ink(render(full), 650, 230, 1232, 395);
-        int halfInk = ink(render(half), 650, 230, 1232, 395);
+        // Main digital digits only (baseline ~311, size 182), above the calendar.
+        int fullInk = ink(render(full), 650, 150, 1100, 330);
+        int halfInk = ink(render(half), 650, 150, 1100, 330);
         assertTrue("main ink at 50% (" + halfInk + ") < 100% (" + fullInk + ")",
                 halfInk < fullInk);
         assertTrue("main line still drawn at 50%", halfInk > 0);
     }
 
     @Test
-    public void smallerSecondarySizePaintsLessSecondaryInk() {
+    public void smallerSecondarySizePaintsLessMetadataInk() {
         ClockConfig full = ClockConfig.defaultConfig();
         ClockConfig half = full.toBuilder().secondarySizePercent(50).build();
-        // Secondary line band only (baseline ~447, size 38), below the main line.
-        int fullInk = ink(render(full), 650, 410, 1232, 458);
-        int halfInk = ink(render(half), 650, 410, 1232, 458);
-        assertTrue("secondary ink at 50% (" + halfInk + ") < 100% (" + fullInk + ")",
+        // Seconds/AM-PM column only; the calendar itself is intentionally fixed-size.
+        int fullInk = ink(render(full), 1080, 140, 1232, 330);
+        int halfInk = ink(render(half), 1080, 140, 1232, 330);
+        assertTrue("metadata ink at 50% (" + halfInk + ") < 100% (" + fullInk + ")",
                 halfInk < fullInk);
-        assertTrue("secondary line still drawn at 50%", halfInk > 0);
+        assertTrue("metadata still drawn at 50%", halfInk > 0);
     }
 
     private static int ink(Bitmap bitmap, int left, int top, int right, int bottom) {
