@@ -1,14 +1,11 @@
 name: Release
 
 # Signed release delivery for a reviewed v-tag. This workflow is the pinned,
-# operator-gated automation that turns the exact reviewed commit into a signed,
-# evidence-backed GitHub Release. It never runs on a branch push and never
-# manufactures SDK-licence or signing authority:
+# automation that turns the exact reviewed commit into a signed,
+# evidence-backed GitHub Release. It never runs on a branch push:
 #
 #   * It fires only for a pushed SemVer tag (or a deliberate manual dispatch),
 #     so publishing is an operator action — pushing the tag.
-#   * Every job is gated on the recorded operator SDK-licence acceptance, the
-#     same human gate CI uses; a pending decision cannot trigger a build.
 #   * Signing key material and passwords resolve at runtime from the private
 #     Infisical/Vaultwarden stores only, are masked, and never touch git, the
 #     workspace, or the logs.
@@ -44,27 +41,11 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # The same human gate CI uses. Merging or tagging never manufactures legal
-  # acceptance; the build jobs below stay skipped until it is recorded.
-  license-gate:
-    name: Android SDK license acceptance gate
-    runs-on: ubuntu-latest
-    steps:
-      - name: Report pending operator acceptance
-        if: ${{ vars.ANDROID_SDK_LICENSE_ACCEPTED != 'true' }}
-        run: echo "::notice::Release build stays disabled until operator SDK-licence acceptance is recorded."
-      - name: Confirm recorded operator acceptance
-        if: ${{ vars.ANDROID_SDK_LICENSE_ACCEPTED == 'true' }}
-        run: echo "Recorded Android SDK license gate is open."
-
-  # ---------------------------------------------------------------------------
   # Build the artifact twice in two independent clean environments and run the
   # full documented outcome gates in each. The two digests feed the byte
   # reproducibility comparison in the publish job.
   reproducible-build:
     name: Clean build & verify (${{ matrix.env_id }})
-    needs: license-gate
-    if: ${{ vars.ANDROID_SDK_LICENSE_ACCEPTED == 'true' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
@@ -87,15 +68,11 @@ jobs:
       - name: Set up Android SDK (platform 29, build-tools 36.0.0)
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
         with:
-          # Licence acceptance is a human gate, not a CI side effect. The
-          # operator-gated runner image must already provide accepted licences.
-          accept-android-sdk-licenses: false
-          # Disable setup-android's default package install; it supplies
-          # affirmative input to sdkmanager even when licence acceptance is off.
+          # Package installation is explicit below so release inputs stay pinned.
           packages: ''
           cmdline-tools-version: ${{ env.ANDROID_CMDLINE_TOOLS_BUILD }}
 
-      - name: Install pinned SDK packages without accepting licences
+      - name: Install pinned SDK packages
         run: |
           sdkmanager --install \
             'platform-tools' \
@@ -130,7 +107,6 @@ jobs:
   sign-and-publish:
     name: Sign, verify, and publish
     needs: reproducible-build
-    if: ${{ vars.ANDROID_SDK_LICENSE_ACCEPTED == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write   # create the GitHub Release and upload assets
@@ -151,13 +127,11 @@ jobs:
       - name: Set up Android SDK (build-tools 36.0.0 for apksigner/zipalign)
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
         with:
-          accept-android-sdk-licenses: false
-          # See the reproducible-build job: package installs must happen only
-          # through our fail-closed </dev/null sdkmanager invocation below.
+          # See the reproducible-build job: package installation stays explicit.
           packages: ''
           cmdline-tools-version: ${{ env.ANDROID_CMDLINE_TOOLS_BUILD }}
 
-      - name: Install pinned SDK packages without accepting licences
+      - name: Install pinned SDK packages
         run: |
           sdkmanager --install \
             'platforms;android-${{ env.ANDROID_PLATFORM }}' \

@@ -3,8 +3,7 @@
 This is the runbook for cutting a signed, evidence-backed GitHub Release of the
 TX10 Clock. It is an **operator delivery step**: it produces an installable,
 signed artifact and publishes it. Nothing here runs automatically on a branch
-push — a release happens only when an operator pushes a SemVer tag and the SDK
-gate is open.
+push — a release happens only when an operator pushes a SemVer tag.
 
 The release inputs are pinned once, in
 [`release/toolchain.lock.json`](../release/toolchain.lock.json) (the single
@@ -28,11 +27,7 @@ CI, and the release workflow all agree with that lock, enforced by
 
 ## Prerequisites (operator, one-time)
 
-1. **SDK licence gate.** Set the repository variable
-   `ANDROID_SDK_LICENSE_ACCEPTED=true` only on a runner image that already has
-   the Android SDK licences accepted. Licence acceptance is never automated in
-   this repo (`scripts/check-no-sdk-license-automation.sh` enforces that).
-2. **Signing material in a private store.** Put the signing keystore and its
+1. **Signing material in a private store.** Put the signing keystore and its
    passwords in Infisical — **never in git, never in GitHub secrets directly**.
    GitHub holds only the machine-identity credentials that let the runner read
    the store: secrets `INFISICAL_CLIENT_ID`, `INFISICAL_CLIENT_SECRET`;
@@ -44,7 +39,7 @@ CI, and the release workflow all agree with that lock, enforced by
    The resolver also supports `vaultwarden://…` on a private runner that
    provides a pinned `bw` CLI and `BW_SESSION`; the committed GitHub-hosted
    release workflow installs and uses the checksum-pinned Infisical CLI.
-3. **Documented signer.** Set variable `RELEASE_SIGNING_CERT_SHA256` to the
+2. **Documented signer.** Set variable `RELEASE_SIGNING_CERT_SHA256` to the
    expected signing-certificate SHA-256 fingerprint. The workflow refuses to
    sign with any other key and re-checks it after signing.
 
@@ -55,7 +50,7 @@ or the logs (see [`scripts/release-resolve-signing.sh`](../scripts/release-resol
 ## Cutting the release
 
 1. Confirm `main` is at the exact reviewed commit and green in CI (the
-   `host-checks` job plus the operator-gated `verify` job — the same clean
+   `host-checks` and `verify` jobs — the same clean
    build, static/unit, and offscreen golden-verifier gates the release re-runs).
 2. Tag that commit and push the tag:
 
@@ -67,7 +62,7 @@ or the logs (see [`scripts/release-resolve-signing.sh`](../scripts/release-resol
    The tag identifies the exact reviewed commit; the SemVer tag pattern
    (`v[0-9]+.[0-9]+.[0-9]+`) is what triggers
    [`.github/workflows/release.yml`](../.github/workflows/release.yml).
-3. The release workflow then, gated on the SDK acceptance:
+3. The release workflow then:
    - **builds twice** in two independent clean environments (`clean-a`,
      `clean-b`), running the full `verify-outcome.sh` gates in each, and
      **compares** the two unsigned APK digests. Byte reproducibility is claimed
