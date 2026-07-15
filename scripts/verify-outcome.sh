@@ -61,7 +61,10 @@ resolve_sdk
 export ANDROID_SDK_ROOT
 log "Android SDK: $ANDROID_SDK_ROOT"
 
-GRADLE="./gradlew --no-daemon --console=plain"
+AAPT2_OVERRIDE="$ANDROID_SDK_ROOT/build-tools/36.0.0/aapt2"
+[ -x "$AAPT2_OVERRIDE" ] \
+    || die "pinned aapt2 not found at $AAPT2_OVERRIDE"
+GRADLE="./gradlew --no-daemon --console=plain -Pandroid.aapt2FromMavenOverride=$AAPT2_OVERRIDE"
 
 # --- 1..3  clean build + static + unit/golden --------------------------------
 log "Clean build, Android Lint, and unit/static/golden checks"
