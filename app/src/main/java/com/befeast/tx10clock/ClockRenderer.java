@@ -164,9 +164,11 @@ public final class ClockRenderer {
         configureMetaText();
         text.setTextAlign(Paint.Align.LEFT);
         if (config.showSeconds) {
+            text.setColor(config.secondHandColor);
             canvas.drawText(ClockFormat.seconds(now), metaX, 188f, text);
         }
         if (!config.use24Hour) {
+            text.setColor(config.dateColor);
             canvas.drawText(ClockFormat.amPm(now), metaX, 309f, text);
         }
 
