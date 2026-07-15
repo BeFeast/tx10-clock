@@ -86,7 +86,7 @@ The `assembleRelease` output of a local/CI build is unsigned. CI may retain it
 under the explicit name `tx10-clock-unsigned-ci-verification-apk` for manifest
 and package inspection only; it is not installable and must not be attached to a
 GitHub Release. The signed, installable APK is produced only by the pinned,
-operator-gated release workflow
+tag-triggered release workflow
 ([`.github/workflows/release.yml`](.github/workflows/release.yml)); the full
 tag → build → sign → verify → publish process, the reproducibility double-build,
 and how to independently inspect a published asset are documented in

@@ -8,10 +8,10 @@
 # Android dependency, so strict-ingestion, last-known-good, reload,
 # atomic-replacement, status, and name-to-colour mapping behaviours can be
 # compiled and exercised under a plain JVM with JUnit — no Android SDK, no
-# device, and without touching the licence-gated Gradle Android build.
+# device, and without touching the Gradle Android build.
 #
-# The same tests also run inside `./gradlew test` once the operator SDK gate is
-# open; this script is the offline entrypoint that needs neither.
+# The same tests also run inside `./gradlew test`; this script is the offline
+# entrypoint that needs neither Gradle nor the Android SDK.
 #
 # JUnit/Hamcrest jars are located via (in order): $JUNIT_JAR / $HAMCREST_JAR
 # env overrides, then a scan of the Gradle module cache. No host path is

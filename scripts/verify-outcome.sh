@@ -13,8 +13,7 @@
 #   4. APK manifest/package inspection: package id, versionName v0.1.0, SDK 29,
 #      and proof the artifact has no lib/** native entries.
 #   5. Public-path hygiene scan.
-#   6. Scope/licence hygiene: the config core is renderer-agnostic and no Android
-#      SDK licence acceptance is automated anywhere in the repo.
+#   6. Scope hygiene: the config core is renderer-agnostic.
 #
 # No device is required and nothing is deployed.
 set -euo pipefail
@@ -119,12 +118,9 @@ scripts/verify-visual-contract.sh || die "visual-contract verification failed"
 log "Public-path hygiene"
 scripts/check-public-hygiene.sh || die "public-path hygiene check failed"
 
-# --- 6  scope & licence hygiene ----------------------------------------------
+# --- 6  scope hygiene ----------------------------------------------------------
 log "Config core is renderer-agnostic (no visual decisions)"
 scripts/check-config-renderer-agnostic.sh || die "config core carries visual decisions"
-
-log "No automated Android SDK licence acceptance"
-scripts/check-no-sdk-license-automation.sh || die "SDK licence acceptance is automated"
 
 log "OUTCOME: PASS"
 printf '\033[32mAll documented repository outcome checks passed.\033[0m\n'

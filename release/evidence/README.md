@@ -1,7 +1,7 @@
 # Release-Evidence Contract
 
 A deterministic, public-safe, versioned **provenance record** for one signed
-tx10-clock GitHub Release. The pinned, operator-gated release workflow
+tx10-clock GitHub Release. The pinned, tag-triggered release workflow
 ([`.github/workflows/release.yml`](../../.github/workflows/release.yml)) must
 produce a release-evidence document and validate it **before** it publishes the
 release, so every claim in the release notes is backed by machine-checkable

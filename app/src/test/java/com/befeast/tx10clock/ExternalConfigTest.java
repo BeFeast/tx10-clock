@@ -15,7 +15,7 @@ import java.util.Arrays;
 /**
  * Deterministic parser/default/error/range checks for the renderer-agnostic
  * {@link ExternalConfig}. Pure JVM — no Android, no device — so strict ingestion
- * is verifiable independent of the licence-gated Android build.
+ * is verifiable independent of the Android build.
  */
 public class ExternalConfigTest {
 

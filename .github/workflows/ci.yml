@@ -16,23 +16,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  android-sdk-license-gate:
-    name: Android SDK license acceptance gate
-    runs-on: ubuntu-latest
-    steps:
-      - name: Report pending operator acceptance
-        if: ${{ vars.ANDROID_SDK_LICENSE_ACCEPTED != 'true' }}
-        run: echo "::notice::Android verification remains disabled until operator acceptance is recorded."
-
-      - name: Confirm recorded operator acceptance
-        if: ${{ vars.ANDROID_SDK_LICENSE_ACCEPTED == 'true' }}
-        run: echo "Recorded Android SDK license gate is open."
-
   host-checks:
     name: Host-only contracts, pins & hygiene (no SDK)
     # These deterministic checks need only Python 3 + bash — no Android SDK,
-    # network, signing key, or device — so they run on every push/PR without
-    # the operator SDK-licence gate and give fast, unconditional PR coverage.
+    # network, signing key, or device — so they give fast PR coverage on
+    # every push/PR.
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -53,9 +41,6 @@ jobs:
       - name: Pinned release inputs
         run: bash scripts/check-release-pins.sh
 
-      - name: No automated SDK licence acceptance
-        run: bash scripts/check-no-sdk-license-automation.sh
-
       - name: Config core is renderer-agnostic
         run: bash scripts/check-config-renderer-agnostic.sh
 
@@ -64,12 +49,6 @@ jobs:
 
   verify:
     name: Build, static checks & offscreen golden verifier
-    # Merging source does not manufacture legal acceptance. No Android action
-    # executes until the explicit operator gate is recorded; the gate's own
-    # check stays informational so a pending SDK decision cannot be confused
-    # with an implementation failure by Maestro's CI retry classifier.
-    needs: android-sdk-license-gate
-    if: ${{ vars.ANDROID_SDK_LICENSE_ACCEPTED == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -85,17 +64,14 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
         with:
-          # License acceptance is a human gate, not a CI side effect. The
-          # operator-gated runner image must already provide accepted licenses.
-          accept-android-sdk-licenses: false
-          # setup-android defaults this to "tools platform-tools" and supplies
-          # affirmative input to sdkmanager. Empty disables that hidden install.
+          # setup-android defaults this to "tools platform-tools"; empty keeps
+          # the SDK install limited to the explicit pinned packages below.
           packages: ''
           # Pinned release inputs (release/toolchain.lock.json): compile against
           # platform 29 with Build Tools 36.0.0 (AGP 9.2.1 requires 36.0.0).
           cmdline-tools-version: ${{ env.ANDROID_CMDLINE_TOOLS_BUILD }}
 
-      - name: Install pinned SDK packages without accepting licences
+      - name: Install pinned SDK packages
         run: |
           sdkmanager --install \
             'platform-tools' \

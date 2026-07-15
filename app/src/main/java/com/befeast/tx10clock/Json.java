@@ -11,8 +11,7 @@ import java.util.Map;
  * <p>It intentionally does <em>not</em> depend on {@code org.json} or any
  * Android class, so the whole configuration core compiles and runs under a plain
  * JVM (no Android SDK, no device) — which is what makes the parser tests
- * deterministic and runnable while the Android build stays behind its licence
- * gate.
+ * deterministic and runnable without the Android toolchain.
  *
  * <p>Strictness is the point. Beyond the JSON grammar it enforces:
  * <ul>
