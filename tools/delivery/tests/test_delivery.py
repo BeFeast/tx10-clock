@@ -9,22 +9,33 @@ import subprocess
 import tempfile
 import unittest
 import zipfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
 DELIVER = ROOT / "scripts" / "deliver.sh"
 TOOL = ROOT / "tools" / "delivery" / "deliver.py"
+RECEIPT_VALIDATOR = ROOT / "tools" / "receipt" / "validate_receipt.py"
 FAKE_ADB = Path(__file__).with_name("fake_adb.py")
 FAKE_APKSIGNER = Path(__file__).with_name("fake_apksigner.py")
 FAKE_AAPT2 = Path(__file__).with_name("fake_aapt2.py")
 CERT = ("AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:"
         "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99")
-TARGET = "FIXTURE_SERIAL_001"
+TARGET = "tx10-delivery-fixture"
+TARGET_SALT = "a" * 64
 
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def target_fingerprint(target):
+    digest = hashlib.sha256()
+    digest.update(TARGET_SALT.encode("utf-8"))
+    digest.update(b"\0")
+    digest.update(target.encode("utf-8"))
+    return "tgt-" + digest.hexdigest()[:16]
 
 
 class DeliveryHarness(unittest.TestCase):
@@ -111,11 +122,14 @@ class DeliveryHarness(unittest.TestCase):
             "approval_id": "oleg-fixture-approval-0001",
             "generation": 1,
             "approved_by": "oleg",
-            "approved_at": "2026-07-23T10:00:00Z",
+            "approved_at": datetime.now(timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"),
             "mode": "fixture",
             "delivery_sha": self.delivery_sha,
             "release_lock_sha256": sha(self.lock),
             "config_sha256": sha(self.config),
+            "target_salt": TARGET_SALT,
+            "target_fingerprint": target_fingerprint(TARGET),
         }
         self.approval = self.root / "approval.json"
         self.approval.write_text(
@@ -171,6 +185,7 @@ class DeliveryHarness(unittest.TestCase):
     def assert_no_leak(self, result):
         for output in (result.stdout, result.stderr):
             self.assertNotIn(TARGET, output)
+            self.assertNotIn(TARGET_SALT, output)
             self.assertNotIn(str(self.root), output)
             self.assertNotIn(str(FAKE_ADB), output)
 
@@ -198,6 +213,19 @@ class ContractTests(DeliveryHarness):
         self.assertEqual(rejected.returncode, 1)
         self.assertFalse(json.loads(rejected.stdout)["valid"])
 
+    def test_release_lock_validation_starts_without_stdlib_zoneinfo(self):
+        blocker = self.root / "blocked-zoneinfo"
+        blocker.mkdir()
+        (blocker / "zoneinfo.py").write_text(
+            'raise ModuleNotFoundError("zoneinfo unavailable")\n', encoding="utf-8")
+        env = dict(os.environ)
+        env["PYTHONPATH"] = str(blocker)
+        result = subprocess.run(
+            ["python3", str(TOOL), "--validate-release-lock", str(self.lock)],
+            capture_output=True, text=True, env=env)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertTrue(json.loads(result.stdout)["valid"])
+
 
 class EntrypointTests(DeliveryHarness):
     def test_missing_target_fails_closed_without_claim_or_adb(self):
@@ -207,6 +235,77 @@ class EntrypointTests(DeliveryHarness):
         self.assertEqual(result.returncode, 2, result.stdout)
         receipt = self.receipt(result)
         self.assertEqual(receipt["failure_code"], "target_missing")
+        self.assertEqual(self.calls(), [])
+        self.assertFalse(self.state_dir.exists())
+        self.assert_no_leak(result)
+
+    def test_fixture_mode_rejects_target_substitution_before_adb(self):
+        env = self.env()
+        env["TX10_ADB_TARGET"] = "substituted-target"
+        result = self.run_delivery(env)
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertEqual(self.receipt(result)["failure_code"],
+                         "fixture_target_invalid")
+        self.assertEqual(self.calls(), [])
+        self.assertFalse(self.state_dir.exists())
+        self.assertNotIn("substituted-target", result.stdout + result.stderr)
+        self.assert_no_leak(result)
+
+    def test_fixture_mode_rejects_external_adb_override(self):
+        external = shutil.which("true")
+        self.assertIsNotNone(external)
+        env = self.env()
+        env["TX10_ADB"] = external
+        result = self.run_delivery(env)
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertEqual(self.receipt(result)["failure_code"],
+                         "fixture_adb_override_forbidden")
+        self.assertEqual(self.calls(), [])
+        self.assertFalse(self.state_dir.exists())
+        self.assertNotIn(external, result.stdout + result.stderr)
+        self.assert_no_leak(result)
+
+    def test_approval_is_bound_to_target_fingerprint(self):
+        approval = json.loads(self.approval.read_text(encoding="utf-8"))
+        approval["target_fingerprint"] = target_fingerprint("different-target")
+        self.approval.write_text(
+            json.dumps(approval, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8")
+        result = self.run_delivery()
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertEqual(self.receipt(result)["failure_code"],
+                         "approval_target_mismatch")
+        self.assertEqual(self.calls(), [])
+        self.assertFalse(self.state_dir.exists())
+        self.assert_no_leak(result)
+
+    def test_expired_approval_fails_before_claim_or_adb(self):
+        approval = json.loads(self.approval.read_text(encoding="utf-8"))
+        approval["approved_at"] = (
+            datetime.now(timezone.utc) - timedelta(minutes=16)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ")
+        self.approval.write_text(
+            json.dumps(approval, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8")
+        result = self.run_delivery()
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertEqual(self.receipt(result)["failure_code"], "approval_expired")
+        self.assertEqual(self.calls(), [])
+        self.assertFalse(self.state_dir.exists())
+        self.assert_no_leak(result)
+
+    def test_future_approval_fails_before_claim_or_adb(self):
+        approval = json.loads(self.approval.read_text(encoding="utf-8"))
+        approval["approved_at"] = (
+            datetime.now(timezone.utc) + timedelta(minutes=2)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ")
+        self.approval.write_text(
+            json.dumps(approval, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8")
+        result = self.run_delivery()
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertEqual(self.receipt(result)["failure_code"],
+                         "approval_timestamp_future")
         self.assertEqual(self.calls(), [])
         self.assertFalse(self.state_dir.exists())
         self.assert_no_leak(result)
@@ -222,6 +321,8 @@ class EntrypointTests(DeliveryHarness):
         self.assertEqual(receipt["delivery_sha"], self.delivery_sha)
         self.assertEqual(receipt["config_sha256"], sha(self.config))
         self.assertEqual(receipt["verification"]["visual_acceptance"], "pending")
+        self.assertEqual(receipt["release_receipt"]["delivery_state"], "delivered")
+        self.assertEqual(receipt["release_receipt"]["verification_state"], "passed")
         for key in ("package", "version", "signature", "installed_apk",
                     "foreground_start", "screenshot", "system_render_time",
                     "home_exit", "back_exit", "restart", "reboot_autostart", "soak"):
@@ -232,6 +333,18 @@ class EntrypointTests(DeliveryHarness):
         self.assertFalse(any("uninstall" in call for call in calls))
         claim_dirs = list(self.state_dir.glob("claim-*"))
         self.assertEqual(len(claim_dirs), 1)
+        release_receipt = claim_dirs[0] / "receipt.json"
+        validated = subprocess.run(
+            ["python3", str(RECEIPT_VALIDATOR), str(release_receipt)],
+            capture_output=True, text=True)
+        self.assertEqual(validated.returncode, 0, validated.stdout)
+        contract = json.loads(release_receipt.read_text(encoding="utf-8"))
+        self.assertEqual(contract["delivery"]["state"], "delivered")
+        self.assertEqual(contract["verification"]["state"], "passed")
+        for json_path in claim_dirs[0].glob("*.json"):
+            stored = json_path.read_text(encoding="utf-8")
+            self.assertNotIn(TARGET, stored)
+            self.assertNotIn(TARGET_SALT, stored)
         self.assertTrue((claim_dirs[0] / "rollback" / "prior.apk").is_file())
         self.assertTrue((claim_dirs[0] / "rollback" / "prior-config.json").is_file())
         self.assertTrue((claim_dirs[0] / "evidence" / "after-install.png").is_file())
@@ -248,6 +361,18 @@ class EntrypointTests(DeliveryHarness):
         private_text = json.dumps(private)
         self.assertNotIn(TARGET, private_text)
         self.assertNotIn(str(self.root), private_text)
+        self.assert_no_leak(result)
+
+    def test_full_entrypoint_runs_when_zoneinfo_module_is_unavailable(self):
+        blocker = self.root / "blocked-zoneinfo"
+        blocker.mkdir()
+        (blocker / "zoneinfo.py").write_text(
+            'raise ModuleNotFoundError("zoneinfo unavailable")\n', encoding="utf-8")
+        env = self.env()
+        env["PYTHONPATH"] = str(blocker)
+        result = self.run_delivery(env)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertTrue(self.receipt(result)["ok"])
         self.assert_no_leak(result)
 
     def test_completed_approval_cannot_replay(self):
@@ -267,7 +392,9 @@ class EntrypointTests(DeliveryHarness):
         # Rewriting non-identity assertion metadata cannot turn the same
         # approval id/generation into a fresh claim.
         approval = json.loads(self.approval.read_text(encoding="utf-8"))
-        approval["approved_at"] = "2026-07-23T10:00:01Z"
+        approval["approved_at"] = (
+            datetime.now(timezone.utc) + timedelta(seconds=1)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ")
         self.approval.write_text(
             json.dumps(approval, sort_keys=True, indent=2) + "\n", encoding="utf-8")
         third = self.run_delivery()
@@ -305,6 +432,37 @@ class EntrypointTests(DeliveryHarness):
         self.assertFalse(any("uninstall" in call for call in calls))
         self.assertTrue(any(call[-1:] == ["com.example.clock/com.example.clock.Main"]
                             for call in calls))
+        self.assert_no_leak(result)
+
+    def test_screenshot_missing_terminal_iend_is_rejected(self):
+        env = self.env()
+        env["FAKE_SCREENSHOT_MODE"] = "missing-iend"
+        result = self.run_delivery(env)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        receipt = self.receipt(result)
+        self.assertEqual(receipt["failure_code"], "screenshot_invalid")
+        self.assertEqual(receipt["rollback"]["disposition"],
+                         "in_place_restore_completed")
+        claim_dir = next(self.state_dir.glob("claim-*"))
+        contract = json.loads(
+            (claim_dir / "receipt.json").read_text(encoding="utf-8"))
+        self.assertEqual(contract["delivery"]["state"], "rolled_back")
+        self.assertEqual(contract["verification"]["state"], "failed")
+        self.assertEqual(contract["rollback"]["reference"], "v0.0.9")
+        self.assertFalse((claim_dir / "evidence" / "after-install.png").exists())
+        self.assert_no_leak(result)
+
+    def test_screenshot_reaching_output_cap_is_rejected(self):
+        env = self.env()
+        env["FAKE_SCREENSHOT_MODE"] = "over-limit"
+        result = self.run_delivery(env)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        receipt = self.receipt(result)
+        self.assertEqual(receipt["failure_code"], "screenshot_output_limit")
+        self.assertEqual(receipt["rollback"]["disposition"],
+                         "in_place_restore_completed")
+        claim_dir = next(self.state_dir.glob("claim-*"))
+        self.assertFalse((claim_dir / "evidence" / "after-install.png").exists())
         self.assert_no_leak(result)
 
     def test_timeout_after_install_still_gets_bounded_recovery_attempt(self):

@@ -7,10 +7,11 @@ private approval, target, config, tool, and durable-state inputs supplied by the
 approved runtime environment.
 
 The script never discovers a live target from repository data or command-line
-arguments, and its JSON receipt never contains the target serial/endpoint,
-local paths, command lines, command output, config content, screenshots, or raw
-rollback details. A salted non-reversible target fingerprint is the only target
-identifier in the receipt.
+arguments. Its detailed claim record and the repository-standard release
+receipt never contain the target serial/endpoint, local paths, command lines,
+command output, config content, screenshots, or raw rollback details. A salted
+non-reversible target fingerprint is the only target identifier in the claim
+record.
 
 ## Public release lock
 
@@ -70,21 +71,43 @@ The approval assertion is strict JSON with exactly these fields:
   "mode": "live",
   "delivery_sha": "40-lowercase-hex-commit-sha",
   "release_lock_sha256": "64-lowercase-hex-digest",
-  "config_sha256": "64-lowercase-hex-digest"
+  "config_sha256": "64-lowercase-hex-digest",
+  "target_salt": "64-lowercase-hex-private-random-salt",
+  "target_fingerprint": "tgt-16-lowercase-hex"
 }
 ```
+
+`target_fingerprint` is `tgt-` plus the first 16 lowercase hex characters of
+`SHA-256(UTF-8(target_salt) || NUL || UTF-8(TX10_ADB_TARGET))`. The random salt
+stays only in the private approval assertion; it is never copied into either
+durable public-safe record. Delivery rejects an approval if the configured
+target does not reproduce the approved fingerprint.
+
+The approval must be no more than 15 minutes old both when delivery starts and
+immediately before claim creation, and may be at most 60 seconds ahead of the
+host clock. Older retained assertions and future-dated assertions fail closed.
 
 For live execution, the script also resolves the current public `main` SHA and
 requires it to equal both checked-out `HEAD` and the approved delivery SHA. All
 static validation and the read-only ADB preflight finish before a claim is made.
 
-## One-use claim and safe receipt
+## Standard receipt and one-use claim
+
+Before creating a claim directory, delivery constructs the established
+[`receipt-v1`](../release/receipt/README.md) document in the `published` /
+`pending` state and invokes
+[`tools/receipt/validate_receipt.py`](../tools/receipt/validate_receipt.py) on it.
+Validation failure leaves the durable state directory and target untouched. The
+claimed copy is stored as `receipt.json`, advances to `delivered` after the APK
+install succeeds, and records final verification or a completed in-place
+rollback through the same validated contract.
 
 Immediately before device work, delivery atomically creates a claim directory
-whose name is derived from the approval id, generation, and approval digest.
+whose name is derived from the approval id and generation.
 An existing directory rejects every replay—including a process interrupted
 before it could finish—so one approval can create only one executing claim.
-The claim file records only public-safe values:
+The separate `claim.json` file records #872's additional public-safe execution
+details:
 
 - approval id/generation/timestamp and exact delivery SHA,
 - release-lock and config digests,
@@ -136,10 +159,15 @@ required. Prior APK/config and screenshots remain private and durable.
 ## Harmless verification
 
 The host-only suite runs the exact `scripts/deliver.sh` entrypoint with a fake
-release, fake Build Tools, and a stateful fake ADB. It covers the complete
-install/navigation/reboot/soak path, missing-target fail-closed behavior,
-pre-install immutability, durable replay rejection, and post-install in-place
-recovery. It never starts ADB or contacts a device or GitHub:
+release, fake Build Tools, and the repository-owned stateful fake ADB. Fixture
+mode requires the fixed `tx10-delivery-fixture` target and refuses any external
+`TX10_ADB` override; the fake executable itself is pinned by SHA-256. Fixture
+execution therefore cannot be redirected to an ADB server or device. The suite
+covers the complete install/navigation/reboot/soak path, missing-target
+fail-closed behavior, target substitution, stale/future approvals, validated
+release receipts, complete PNG evidence, pre-install immutability, durable
+replay rejection, and post-install in-place recovery. It never starts ADB or
+contacts a device or GitHub:
 
 ```sh
 bash delivery/run-delivery-tests.sh

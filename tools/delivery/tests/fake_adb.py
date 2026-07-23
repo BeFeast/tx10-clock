@@ -17,8 +17,7 @@ REMOTE_APK = "/data/app/com.befeast.tx10clock-1/base.apk"
 CONFIG = "/sdcard/Android/data/com.befeast.tx10clock/files/config.json"
 STATUS = "/sdcard/Android/data/com.befeast.tx10clock/files/status.json"
 
-# A complete 1x1 transparent PNG. The delivery verifier only trusts the PNG
-# signature/IHDR dimensions; retaining it also proves screenshot bytes are kept
+# A complete 1x1 transparent PNG. Retaining it proves screenshot bytes are kept
 # in private evidence instead of being printed.
 PNG = bytes.fromhex(
     "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
@@ -189,7 +188,13 @@ def main(argv):
     elif args == ["shell", "cat", STATUS]:
         out = status_json(state)
     elif args == ["exec-out", "screencap", "-p"]:
-        binary = PNG
+        mode = os.environ.get("FAKE_SCREENSHOT_MODE", "complete")
+        if mode == "missing-iend":
+            binary = PNG[:-12]
+        elif mode == "over-limit":
+            binary = PNG + (b"\0" * (1024 * 1024))
+        else:
+            binary = PNG
     elif args == ["reboot"]:
         state["rebooted"] = True
         state["foreground"] = (

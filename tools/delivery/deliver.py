@@ -4,8 +4,9 @@
 The live path deliberately has no command-line knobs. Every private input is
 resolved from the approved runtime environment, while the release identity is
 pinned by the committed ``delivery/release-lock.json``. The implementation is
-standard-library only and emits one public-safe JSON receipt: it never prints
-the target serial/endpoint, local paths, command lines, command output, config
+standard-library only. It validates and persists the repository-standard
+release receipt plus one detailed public-safe claim record; neither prints the
+target serial/endpoint, local paths, command lines, command output, config
 content, or rollback text.
 
 Live environment (all paths and target values remain private):
@@ -38,11 +39,11 @@ import sys
 import tempfile
 import time
 import zipfile
+import zlib
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -52,13 +53,20 @@ REPOSITORY = "BeFeast/tx10-clock"
 RELEASE_TAG = "v0.1.0"
 RELEASE_LOCK = ROOT / "delivery" / "release-lock.json"
 RELEASE_EVIDENCE_NAME = "release-evidence.json"
+RECEIPT_VALIDATOR = ROOT / "tools" / "receipt" / "validate_receipt.py"
+FIXTURE_ADB = ROOT / "tools" / "delivery" / "tests" / "fake_adb.py"
+FIXTURE_ADB_SHA256 = (
+    "5bc07acbe752c84a5ea891982fc25b75ba20afb715df86851921d7f14b5353cd")
+FIXTURE_TARGET = "tx10-delivery-fixture"
 CONFIG_DIR = "/sdcard/Android/data/com.befeast.tx10clock/files"
 CONFIG_REMOTE = CONFIG_DIR + "/config.json"
 STATUS_REMOTE = CONFIG_DIR + "/status.json"
 
 SCHEMA_VERSION = "1.0.0"
-RECEIPT_SCHEMA = "tx10-delivery-receipt/v1"
+DELIVERY_RECORD_SCHEMA = "tx10-delivery-claim/v1"
 APPROVAL_RECEIPT_REF = "872"
+APPROVAL_MAX_AGE_SECONDS = 15 * 60
+APPROVAL_MAX_FUTURE_SKEW_SECONDS = 60
 LIVE_TIMEOUT_SECONDS = 60 * 60
 LIVE_SOAK_SECONDS = 30 * 60
 LIVE_SOAK_INTERVAL_SECONDS = 30
@@ -79,6 +87,7 @@ SEMVER_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 CERT_RE = re.compile(r"^(?:[0-9A-F]{2}:){31}[0-9A-F]{2}$")
 APPROVAL_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{7,63}$")
 TARGET_RE = re.compile(r"^[A-Za-z0-9._:\[\]-]{2,128}$")
+TARGET_FINGERPRINT_RE = re.compile(r"^tgt-[0-9a-f]{16}$")
 COMPONENT_RE = re.compile(r"^[A-Za-z0-9._$]+/[A-Za-z0-9._$]+$")
 REMOTE_APK_RE = re.compile(r"^/data/app/[A-Za-z0-9._=+~/-]{1,500}/base\.apk$")
 PID_RE = re.compile(r"^[0-9]{1,10}$")
@@ -166,6 +175,8 @@ class CommandResult:
     returncode: int
     stdout: bytes
     stderr: bytes
+    stdout_truncated: bool
+    stderr_truncated: bool
 
 
 def utc_now() -> str:
@@ -174,6 +185,14 @@ def utc_now() -> str:
 
 def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
+
+
+def target_fingerprint(salt: str, target: str) -> str:
+    digest = hashlib.sha256()
+    digest.update(salt.encode("utf-8"))
+    digest.update(b"\x00")
+    digest.update(target.encode("utf-8"))
+    return "tgt-" + digest.hexdigest()[:16]
 
 
 def sha256_file(path: Path) -> str:
@@ -245,6 +264,27 @@ def parse_utc(value: Any, stage: str, code: str) -> str:
     return text
 
 
+def parse_utc_datetime(value: Any, stage: str, code: str) -> datetime:
+    text = parse_utc(value, stage, code)
+    return datetime.strptime(text, "%Y-%m-%dT%H:%M:%SZ").replace(
+        tzinfo=timezone.utc)
+
+
+def require_fresh_approval(approved_at: datetime,
+                           now: Optional[datetime] = None) -> None:
+    stage = "approval"
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    else:
+        current = current.astimezone(timezone.utc)
+    if approved_at > current + timedelta(
+            seconds=APPROVAL_MAX_FUTURE_SKEW_SECONDS):
+        raise DeliveryFailure(stage, "approval_timestamp_future")
+    if approved_at < current - timedelta(seconds=APPROVAL_MAX_AGE_SECONDS):
+        raise DeliveryFailure(stage, "approval_expired")
+
+
 def validate_release_lock(raw: bytes) -> Dict[str, Any]:
     stage = "release_lock"
     code = "release_lock_invalid"
@@ -295,14 +335,16 @@ def validate_release_lock(raw: bytes) -> Dict[str, Any]:
 
 
 def validate_approval(raw: bytes, mode: str, delivery_sha: str,
-                      lock_digest: str, config_digest: str) -> Dict[str, Any]:
+                      lock_digest: str, config_digest: str, target: str,
+                      now: Optional[datetime] = None) -> Dict[str, Any]:
     stage = "approval"
     code = "approval_invalid"
     approval = strict_json_bytes(raw, stage, code)
     expected = (
         "schema_version", "receipt_ref", "approval_id", "generation",
         "approved_by", "approved_at", "mode", "delivery_sha",
-        "release_lock_sha256", "config_sha256",
+        "release_lock_sha256", "config_sha256", "target_salt",
+        "target_fingerprint",
     )
     exact_keys(approval, expected, stage, code)
     if (approval["schema_version"] != SCHEMA_VERSION
@@ -314,10 +356,17 @@ def validate_approval(raw: bytes, mode: str, delivery_sha: str,
             or approval["config_sha256"] != config_digest):
         raise DeliveryFailure(stage, code)
     require_string(approval["approval_id"], APPROVAL_ID_RE, stage, code)
-    parse_utc(approval["approved_at"], stage, code)
+    approved_at = parse_utc_datetime(approval["approved_at"], stage, code)
     if isinstance(approval["generation"], bool) or not isinstance(
             approval["generation"], int) or approval["generation"] < 1:
         raise DeliveryFailure(stage, code)
+    salt = nonzero_digest(approval["target_salt"], stage, code)
+    approved_target = require_string(
+        approval["target_fingerprint"], TARGET_FINGERPRINT_RE, stage, code)
+    if approved_target != target_fingerprint(salt, target):
+        raise DeliveryFailure(stage, "approval_target_mismatch")
+
+    require_fresh_approval(approved_at, now)
     return approval
 
 
@@ -374,9 +423,18 @@ def validate_runtime_config(raw: bytes) -> Dict[str, Any]:
                             value) is None:
                 raise DeliveryFailure(stage, code)
             try:
-                ZoneInfo(value)
-            except ZoneInfoNotFoundError:
-                raise DeliveryFailure(stage, code)
+                from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+            except ImportError:
+                # Python 3.8 has no stdlib zoneinfo. The Android runtime still
+                # rejects an unusable zone and the status check below requires
+                # the exact effective config, so startup remains compatible
+                # without weakening the live acceptance check.
+                pass
+            else:
+                try:
+                    ZoneInfo(value)
+                except ZoneInfoNotFoundError:
+                    raise DeliveryFailure(stage, code)
         effective[key] = value
     if effective["bootStart"] is not True:
         raise DeliveryFailure(stage, "config_boot_start_required")
@@ -399,24 +457,76 @@ class Deadline:
 
 
 def command(argv: Sequence[str], deadline: Deadline, stage: str,
-            timeout: float = 30, env: Optional[Dict[str, str]] = None) -> CommandResult:
+            timeout: float = 30, env: Optional[Dict[str, str]] = None,
+            input_data: Optional[bytes] = None,
+            output_cap: int = COMMAND_OUTPUT_CAP) -> CommandResult:
+    run_options: Dict[str, Any] = {
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.PIPE,
+        "timeout": deadline.timeout(timeout, stage),
+        "env": env,
+    }
+    if input_data is None:
+        run_options["stdin"] = subprocess.DEVNULL
+    else:
+        run_options["input"] = input_data
     try:
-        proc = subprocess.run(
-            list(argv), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, timeout=deadline.timeout(timeout, stage), env=env,
-        )
+        proc = subprocess.run(list(argv), **run_options)
     except subprocess.TimeoutExpired:
         raise DeliveryFailure(stage, "command_timeout")
     except OSError:
         raise DeliveryFailure(stage, "tool_unavailable", EXIT_USAGE)
     return CommandResult(
-        proc.returncode, proc.stdout[:COMMAND_OUTPUT_CAP],
-        proc.stderr[:COMMAND_OUTPUT_CAP],
+        proc.returncode, proc.stdout[:output_cap], proc.stderr[:output_cap],
+        len(proc.stdout) > output_cap, len(proc.stderr) > output_cap,
     )
 
 
 def decoded(value: bytes) -> str:
     return value.decode("utf-8", "replace")
+
+
+def png_dimensions(data: bytes) -> Optional[Tuple[int, int]]:
+    """Return dimensions only for a complete, CRC-valid PNG byte stream."""
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        return None
+    offset = 8
+    first = True
+    dimensions: Optional[Tuple[int, int]] = None
+    saw_idat = False
+    while offset < len(data):
+        if len(data) - offset < 12:
+            return None
+        length = int.from_bytes(data[offset:offset + 4], "big")
+        chunk_type = data[offset + 4:offset + 8]
+        if re.fullmatch(rb"[A-Za-z]{4}", chunk_type) is None:
+            return None
+        chunk_end = offset + 12 + length
+        if chunk_end > len(data):
+            return None
+        payload = data[offset + 8:offset + 8 + length]
+        expected_crc = int.from_bytes(
+            data[offset + 8 + length:chunk_end], "big")
+        actual_crc = zlib.crc32(chunk_type + payload) & 0xFFFFFFFF
+        if actual_crc != expected_crc:
+            return None
+        if first:
+            if chunk_type != b"IHDR" or length != 13:
+                return None
+            width = int.from_bytes(payload[0:4], "big")
+            height = int.from_bytes(payload[4:8], "big")
+            dimensions = (width, height)
+            first = False
+        elif chunk_type == b"IHDR":
+            return None
+        if chunk_type == b"IDAT":
+            saw_idat = True
+        if chunk_type == b"IEND":
+            if length != 0 or not saw_idat or chunk_end != len(data):
+                return None
+            return dimensions
+        offset = chunk_end
+    return None
 
 
 def resolve_tool(env_name: str, default: str, stage: str) -> str:
@@ -450,9 +560,9 @@ def atomic_write(path: Path, value: Dict[str, Any]) -> None:
             pass
 
 
-def safe_receipt_base() -> Dict[str, Any]:
+def safe_delivery_record_base() -> Dict[str, Any]:
     return {
-        "schema": RECEIPT_SCHEMA,
+        "schema": DELIVERY_RECORD_SCHEMA,
         "receipt_ref": APPROVAL_RECEIPT_REF,
         "ok": False,
         "failure_stage": None,
@@ -463,6 +573,7 @@ def safe_receipt_base() -> Dict[str, Any]:
         "release_lock_sha256": None,
         "config_sha256": None,
         "release": None,
+        "release_receipt": None,
         "target_fingerprint": None,
         "timestamps": {"started_at": utc_now(), "finished_at": None},
         "exit_results": {},
@@ -485,7 +596,7 @@ def safe_receipt_base() -> Dict[str, Any]:
 
 class Delivery:
     def __init__(self) -> None:
-        self.receipt = safe_receipt_base()
+        self.receipt = safe_delivery_record_base()
         self.mode = os.environ.get("TX10_DELIVERY_MODE", "live").strip()
         if self.mode not in ("live", "fixture"):
             raise DeliveryFailure("environment", "mode_invalid", EXIT_USAGE)
@@ -507,7 +618,6 @@ class Delivery:
         self.config_digest = ""
         self.effective_config: Dict[str, Any] = {}
         self.approval: Dict[str, Any] = {}
-        self.approval_digest = ""
         self.target = ""
         self.target_fingerprint = ""
         self.adb_path = ""
@@ -516,10 +626,12 @@ class Delivery:
         self.apksigner_path = ""
         self.claim_dir: Optional[Path] = None
         self.claim_file: Optional[Path] = None
+        self.release_receipt_file: Optional[Path] = None
         self.private_evidence_file: Optional[Path] = None
         self.claim_id = ""
         self.release_apk: Optional[Path] = None
         self.release_evidence: Optional[Path] = None
+        self.release_receipt: Dict[str, Any] = {}
         self.install_started = False
         self.prior: Dict[str, Any] = {
             "installed": False, "apk_backup": None, "config_present": False,
@@ -560,6 +672,135 @@ class Delivery:
             raise DeliveryFailure(stage, "git_state_invalid")
         return decoded(result.stdout).strip()
 
+    def _fixture_adb(self, stage: str) -> str:
+        expected = FIXTURE_ADB.resolve()
+        configured = os.environ.get("TX10_ADB", "").strip()
+        if configured and Path(configured).resolve() != expected:
+            raise DeliveryFailure(
+                stage, "fixture_adb_override_forbidden", EXIT_USAGE)
+        if (not expected.is_file() or FIXTURE_ADB.is_symlink()
+                or not os.access(str(expected), os.X_OK)
+                or sha256_file(expected) != FIXTURE_ADB_SHA256):
+            raise DeliveryFailure(stage, "fixture_adb_untrusted", EXIT_USAGE)
+        return str(expected)
+
+    def _build_release_receipt(self) -> None:
+        observed_at = self.receipt["timestamps"]["started_at"]
+        identity = (
+            self.approval["approval_id"] + "\0"
+            + str(self.approval["generation"]) + "\0"
+            + self.delivery_sha + "\0" + self.lock_digest
+        ).encode("utf-8")
+        receipt_id = "tx10-872-" + sha256_bytes(identity)[:24]
+        self.release_receipt = {
+            "schema_version": SCHEMA_VERSION,
+            "receipt_id": receipt_id,
+            "source": {
+                "repository": REPOSITORY,
+                "commit_sha": self.lock["release"]["source_commit_sha"],
+                "release_tag": self.lock["release"]["tag"],
+            },
+            "artifact": {
+                "filename": self.lock["artifact"]["name"],
+                "sha256": self.lock["artifact"]["sha256"],
+                "size_bytes": self.lock["artifact"]["size_bytes"],
+            },
+            "package": dict(self.lock["package"]),
+            "signing": {
+                "certificate_sha256_fingerprint":
+                    self.lock["signing"]["certificate_sha256"],
+            },
+            "approval": {
+                "approved_by": "oleg",
+                "approved_at": self.approval["approved_at"],
+            },
+            "delivery": {
+                "state": "published",
+                "history": [
+                    {"state": "built", "at": observed_at},
+                    {"state": "published", "at": observed_at},
+                ],
+            },
+            "verification": {"state": "pending", "verified_at": None},
+            "rollback": None,
+        }
+        self._sync_release_receipt_summary()
+
+    def _sync_release_receipt_summary(self) -> None:
+        if not self.release_receipt:
+            return
+        self.receipt["release_receipt"] = {
+            "receipt_id": self.release_receipt["receipt_id"],
+            "delivery_state": self.release_receipt["delivery"]["state"],
+            "verification_state": self.release_receipt["verification"]["state"],
+        }
+
+    def _validate_release_receipt(self, stage: str) -> None:
+        result = command(
+            [sys.executable, str(RECEIPT_VALIDATOR), "-"], Deadline(30), stage,
+            timeout=30, input_data=json_bytes(self.release_receipt))
+        try:
+            report = json.loads(decoded(result.stdout))
+        except ValueError:
+            raise DeliveryFailure(stage, "receipt_contract_validator_failed")
+        if (result.returncode != 0 or result.stdout_truncated
+                or not isinstance(report, dict) or report.get("valid") is not True):
+            raise DeliveryFailure(stage, "receipt_contract_invalid")
+        self._record(stage)
+
+    def _persist_release_receipt(self, stage: str) -> None:
+        if self.release_receipt_file is None:
+            raise DeliveryFailure(stage, "receipt_contract_store_unavailable")
+        self._validate_release_receipt(stage)
+        self._sync_release_receipt_summary()
+        try:
+            atomic_write(self.release_receipt_file, self.release_receipt)
+        except OSError:
+            raise DeliveryFailure(stage, "receipt_contract_store_unavailable")
+
+    def _mark_release_delivered(self) -> None:
+        stage = "receipt_delivery"
+        if self.release_receipt["delivery"]["state"] != "published":
+            raise DeliveryFailure(stage, "receipt_contract_state_invalid")
+        delivered_at = utc_now()
+        self.release_receipt["delivery"]["history"].append(
+            {"state": "delivered", "at": delivered_at})
+        self.release_receipt["delivery"]["state"] = "delivered"
+        self._persist_release_receipt(stage)
+
+    def _complete_release_receipt(self) -> None:
+        stage = "receipt_verification"
+        if self.release_receipt["delivery"]["state"] != "delivered":
+            raise DeliveryFailure(stage, "receipt_contract_state_invalid")
+        self.release_receipt["verification"] = {
+            "state": "passed", "verified_at": utc_now()}
+        self._persist_release_receipt(stage)
+
+    def _finalize_failed_release_receipt(self) -> None:
+        if self.release_receipt_file is None or not self.release_receipt:
+            return
+        state = self.release_receipt["delivery"]["state"]
+        if state not in ("delivered", "rolled_back"):
+            return
+        finished_at = utc_now()
+        self.release_receipt["verification"] = {
+            "state": "failed", "verified_at": finished_at}
+        if (state == "delivered"
+                and self.receipt["rollback"]["disposition"]
+                == "in_place_restore_completed"):
+            self.release_receipt["delivery"]["history"].append(
+                {"state": "rolled_back", "at": finished_at})
+            self.release_receipt["delivery"]["state"] = "rolled_back"
+            prior_version = self.prior.get("version_name")
+            reference = self.release_receipt["receipt_id"]
+            if isinstance(prior_version, str) and SEMVER_RE.fullmatch(prior_version):
+                reference = "v" + prior_version
+            self.release_receipt["rollback"] = {
+                "reference": reference,
+                "reason": "automated in-place restore after failed acceptance",
+            }
+        self._persist_release_receipt("receipt_failure")
+
     def static_inputs(self) -> None:
         stage = "environment"
         self.target = os.environ.get("TX10_ADB_TARGET", "").strip()
@@ -567,6 +808,8 @@ class Delivery:
             raise DeliveryFailure(stage, "target_missing", EXIT_USAGE)
         if TARGET_RE.fullmatch(self.target) is None:
             raise DeliveryFailure(stage, "target_invalid", EXIT_USAGE)
+        if self.mode == "fixture" and self.target != FIXTURE_TARGET:
+            raise DeliveryFailure(stage, "fixture_target_invalid", EXIT_USAGE)
 
         approval_value = os.environ.get("TX10_DELIVERY_APPROVAL_FILE", "").strip()
         config_value = os.environ.get("TX10_DELIVERY_CONFIG", "").strip()
@@ -609,10 +852,9 @@ class Delivery:
 
         approval_raw = read_bytes(
             approval_path, 64 * 1024, "approval", "approval_unreadable")
-        self.approval_digest = sha256_bytes(approval_raw)
         self.approval = validate_approval(
             approval_raw, self.mode, self.delivery_sha, self.lock_digest,
-            self.config_digest)
+            self.config_digest, self.target)
 
         self.receipt["approval"] = {
             "approval_id": self.approval["approval_id"],
@@ -631,10 +873,13 @@ class Delivery:
             "apk_sha256": self.lock["artifact"]["sha256"],
             "certificate_sha256": self.lock["signing"]["certificate_sha256"],
         }
+        self._build_release_receipt()
 
         self.state_dir = state_dir
         self.config_path = config_path
-        self.adb_path = resolve_tool("TX10_ADB", "adb", stage)
+        self.adb_path = (
+            self._fixture_adb(stage) if self.mode == "fixture"
+            else resolve_tool("TX10_ADB", "adb", stage))
         self.aapt2_path = self._android_tool("TX10_AAPT2", "aapt2", stage)
         self.apksigner_path = self._android_tool(
             "TX10_APKSIGNER", "apksigner", stage)
@@ -853,11 +1098,10 @@ class Delivery:
 
     def preflight(self) -> None:
         stage = "preflight"
-        salt = "approval-" + self.approval_digest
         env = dict(os.environ)
         env["TX10_ADB_TARGET"] = self.target
         env["TX10_ADB"] = self.adb_path
-        env["TX10_PREFLIGHT_SALT"] = salt
+        env["TX10_PREFLIGHT_SALT"] = self.approval["target_salt"]
         result = command(
             [sys.executable, str(ROOT / "tools" / "adb-preflight" / "adb_preflight.py")],
             self.deadline, stage, timeout=120, env=env)
@@ -868,9 +1112,11 @@ class Delivery:
             raise DeliveryFailure(stage, "preflight_report_invalid")
         if result.returncode != 0 or report.get("ok") is not True:
             raise DeliveryFailure(stage, "preflight_failed")
-        if not isinstance(fingerprint, str) or re.fullmatch(
-                r"tgt-[0-9a-f]{16}", fingerprint) is None:
+        if (not isinstance(fingerprint, str)
+                or TARGET_FINGERPRINT_RE.fullmatch(fingerprint) is None):
             raise DeliveryFailure(stage, "preflight_report_invalid")
+        if fingerprint != self.approval["target_fingerprint"]:
+            raise DeliveryFailure(stage, "preflight_target_mismatch")
         self.target_fingerprint = fingerprint
         self.receipt["target_fingerprint"] = fingerprint
         self.private_evidence["target_fingerprint"] = fingerprint
@@ -878,6 +1124,11 @@ class Delivery:
 
     def claim(self) -> None:
         stage = "claim"
+        require_fresh_approval(parse_utc_datetime(
+            self.approval["approved_at"], "approval", "approval_invalid"))
+        # The repository-wide receipt-v1 contract is the delivery-state source
+        # of truth. Validate it before even creating the durable claim store.
+        self._validate_release_receipt("receipt_contract")
         claim_material = (
             self.approval["approval_id"] + "\0"
             + str(self.approval["generation"])
@@ -908,6 +1159,7 @@ class Delivery:
         except OSError:
             raise DeliveryFailure(stage, "claim_store_unavailable", EXIT_USAGE)
         self.claim_file = self.claim_dir / "claim.json"
+        self.release_receipt_file = self.claim_dir / "receipt.json"
         self.private_evidence_file = self.claim_dir / "private-evidence.json"
         claimed_at = utc_now()
         self.receipt["claim"] = {
@@ -915,6 +1167,7 @@ class Delivery:
             "claimed_at": claimed_at, "completed_at": None,
         }
         try:
+            atomic_write(self.release_receipt_file, self.release_receipt)
             atomic_write(self.claim_file, self.receipt)
         except OSError:
             raise DeliveryFailure(stage, "claim_store_unavailable", EXIT_USAGE)
@@ -1055,6 +1308,7 @@ class Delivery:
         if result.returncode != 0 or "Success" not in decoded(result.stdout + result.stderr):
             raise DeliveryFailure(stage, "adb_install_failed")
         self._record("install")
+        self._mark_release_delivered()
 
         stage = "config_publish"
         suffix = self.claim_id.replace("claim-", "")[:12]
@@ -1166,10 +1420,12 @@ class Delivery:
             ["exec-out", "screencap", "-p"], stage, "screenshot_failed",
             timeout=60)
         data = result.stdout
-        if len(data) < 24 or data[:8] != b"\x89PNG\r\n\x1a\n" or data[12:16] != b"IHDR":
+        if result.stdout_truncated or len(data) >= COMMAND_OUTPUT_CAP:
+            raise DeliveryFailure(stage, "screenshot_output_limit")
+        dimensions = png_dimensions(data)
+        if dimensions is None:
             raise DeliveryFailure(stage, "screenshot_invalid")
-        width = int.from_bytes(data[16:20], "big")
-        height = int.from_bytes(data[20:24], "big")
+        width, height = dimensions
         if width < 1 or height < 1 or width > 8192 or height > 8192:
             raise DeliveryFailure(stage, "screenshot_invalid")
         evidence_dir = self.claim_dir / "evidence"
@@ -1374,6 +1630,13 @@ class Delivery:
         self._write_private_evidence()
 
     def finish(self, ok: bool, failure: Optional[DeliveryFailure]) -> bool:
+        if not ok:
+            try:
+                self._finalize_failed_release_receipt()
+            except DeliveryFailure as receipt_failure:
+                self._record(receipt_failure.stage, receipt_failure.exit_code)
+                if failure is None:
+                    failure = receipt_failure
         self.receipt["ok"] = ok
         self.receipt["timestamps"]["finished_at"] = utc_now()
         if failure is not None:
@@ -1422,6 +1685,7 @@ class Delivery:
             self.verify_navigation_and_restart()
             self.reboot_and_verify()
             self.soak()
+            self._complete_release_receipt()
             self.receipt["ok"] = True
             return EXIT_OK if self.finish(True, None) else EXIT_FAILED
         except DeliveryFailure as exc:
@@ -1474,14 +1738,14 @@ def main(argv: Sequence[str]) -> int:
         return validate_lock_cli(argv[1])
     if argv:
         sys.stdout.buffer.write(json_bytes({
-            "schema": RECEIPT_SCHEMA, "ok": False,
+            "schema": DELIVERY_RECORD_SCHEMA, "ok": False,
             "failure_stage": "arguments", "failure_code": "arguments_forbidden",
         }))
         return EXIT_USAGE
     try:
         return Delivery().run()
     except DeliveryFailure as exc:
-        receipt = safe_receipt_base()
+        receipt = safe_delivery_record_base()
         receipt["failure_stage"] = exc.stage
         receipt["failure_code"] = exc.code
         receipt["timestamps"]["finished_at"] = utc_now()
