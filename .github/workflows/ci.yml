@@ -37,6 +37,9 @@ jobs:
       - name: ADB delivery preflight contract
         run: bash delivery/preflight/run-preflight-tests.sh
 
+      - name: Approval-gated delivery contract
+        run: bash delivery/run-delivery-tests.sh
+
       - name: Pinned release inputs
         run: bash scripts/check-release-pins.sh
 

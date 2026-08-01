@@ -121,6 +121,23 @@ checks, the offscreen golden verifier, an APK manifest/package inspection
 (package id, `versionName` `0.1.0`, SDK 29, **no `lib/**` native entries**), and
 the public-path hygiene scan.
 
+## Approval-gated delivery
+
+[`scripts/deliver.sh`](scripts/deliver.sh) is the stable exact-SHA delivery
+entrypoint. Live use is fail-closed unless the checked-out merged commit carries
+the reviewed `delivery/release-lock.json` for the published signed release and
+the approved private runtime supplies Oleg's one-use approval assertion,
+canonical target, exact config, and durable claim directory. The complete
+release-lock, receipt, install/verification, timeout, soak, and non-destructive
+rollback contract is documented in [`delivery/README.md`](delivery/README.md).
+
+The delivery path has a host-only harmless fixture suite—no ADB server, device,
+GitHub request, or runtime mutation:
+
+```bash
+delivery/run-delivery-tests.sh
+```
+
 ## Management Home
 
 Product-management and planning context lives in the operator's synced Obsidian

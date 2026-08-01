@@ -63,5 +63,7 @@ including an assertion that every command the tool actually executed
 satisfies it.
 
 This directory authorizes no live ADB call and no device mutation. Actual
-installation remains a separate, operator-approved step outside this
-repository's automation.
+installation is a separate exact-SHA, one-use approval path implemented by
+[`scripts/deliver.sh`](../../scripts/deliver.sh); see
+[`delivery/README.md`](../README.md). The preflight remains read-only even when
+invoked by that delivery entrypoint.
