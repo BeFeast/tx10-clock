@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "repository": "BeFeast/tx10-clock",
+  "release": {
+    "tag": "v0.1.0",
+    "source_commit_sha": "7a1213de144e7b867a5a756bb5ab6e1e1437d680",
+    "tag_ref_sha": "2fbaee1813cbffe725c7393473a7c72b1bcb8c89"
+  },
+  "artifact": {
+    "name": "tx10-clock-v0.1.0-release.apk",
+    "sha256": "d95198c30ec8dd9be6628c4c1a34ad6d1a68a52b5e803d2774aeed587c8c2c45",
+    "size_bytes": 2151797
+  },
+  "package": {
+    "application_id": "com.befeast.tx10clock",
+    "version_name": "0.1.0",
+    "version_code": 1
+  },
+  "signing": {
+    "certificate_sha256": "A3:B7:33:C6:15:C4:D7:20:CB:CA:4C:E3:2A:0B:CF:60:87:3F:E2:D4:A2:E8:C0:A5:2F:10:E3:5B:C1:17:46:11"
+  },
+  "evidence": {
+    "name": "release-evidence.json",
+    "sha256": "37d0ed3691bf9489910c4ec00f1d16b05fc1f6a514b49ff0bd3879bd223bb64b"
+  }
+}
