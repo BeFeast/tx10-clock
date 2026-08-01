@@ -27,7 +27,16 @@ CI, and the release workflow all agree with that lock, enforced by
 
 ## Prerequisites (operator, one-time)
 
-1. **Signing material in a private store.** Put the signing keystore and its
+1. **Dedicated signing runner.** Register a repository-scoped Linux x64
+   self-hosted GitHub Actions runner with the custom label
+   `tx10-release-signing`. Reserve that label for release infrastructure. The
+   runner must be able to resolve and reach the configured private Infisical
+   API as well as GitHub, and must provide the standard host tools used by the
+   workflow (`bash`, `curl`, `tar`, `sha256sum`, `base64`, `python3`, and
+   `gh`). Keep it online as a managed service; after the two GitHub-hosted clean
+   builds finish, Actions assigns the signing job to it automatically. No
+   artifact handoff or signing command is run manually.
+2. **Signing material in a private store.** Put the signing keystore and its
    passwords in Infisical — **never in git, never in GitHub secrets directly**.
    GitHub holds only the machine-identity credentials that let the runner read
    the store: secrets `INFISICAL_CLIENT_ID`, `INFISICAL_CLIENT_SECRET`;
@@ -37,15 +46,17 @@ CI, and the release workflow all agree with that lock, enforced by
      `TX10_RELEASE_KEYSTORE_PASSWORD`, `TX10_RELEASE_KEY_ALIAS`,
      `TX10_RELEASE_KEY_PASSWORD`.
    The resolver also supports `vaultwarden://…` on a private runner that
-   provides a pinned `bw` CLI and `BW_SESSION`; the committed GitHub-hosted
-   release workflow installs and uses the checksum-pinned Infisical CLI.
-2. **Documented signer.** Set variable `RELEASE_SIGNING_CERT_SHA256` to the
+   provides a pinned `bw` CLI and `BW_SESSION`; the release signing job installs
+   and uses the checksum-pinned Infisical CLI.
+3. **Documented signer.** Set variable `RELEASE_SIGNING_CERT_SHA256` to the
    expected signing-certificate SHA-256 fingerprint. The workflow refuses to
    sign with any other key and re-checks it after signing.
 
 Signing material and passwords resolve only from the private store, are masked
 with `::add-mask::`, are written only under `$RUNNER_TEMP`, and never enter git
 or the logs (see [`scripts/release-resolve-signing.sh`](../scripts/release-resolve-signing.sh)).
+The workflow removes the temporary keystore with an `always()` cleanup step so
+it does not remain on the self-hosted runner after success or failure.
 
 ## Cutting the release
 
@@ -67,6 +78,10 @@ or the logs (see [`scripts/release-resolve-signing.sh`](../scripts/release-resol
      `clean-b`), running the full `verify-outcome.sh` gates in each, and
      **compares** the two unsigned APK digests. Byte reproducibility is claimed
      only if the comparison matches.
+   - assigns only the **sign, verify, and publish** job to the dedicated
+     `tx10-release-signing` self-hosted runner, where the private store is
+     reachable. The unsigned builds remain on independent GitHub-hosted
+     runners.
    - **aligns the signer before signing**: it reads the keystore certificate’s
      SHA-256 and aborts unless it equals `RELEASE_SIGNING_CERT_SHA256`.
    - `zipalign`s, signs, and runs `apksigner verify --print-certs -Werr`,

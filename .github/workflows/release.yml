@@ -107,7 +107,14 @@ jobs:
   sign-and-publish:
     name: Sign, verify, and publish
     needs: reproducible-build
-    runs-on: ubuntu-latest
+    # Only this job crosses the private-store boundary. The custom label is
+    # reserved for the dedicated release runner with private-store reachability;
+    # the independent clean builds above remain GitHub-hosted.
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - tx10-release-signing
     permissions:
       contents: write   # create the GitHub Release and upload assets
     steps:
@@ -232,3 +239,10 @@ jobs:
             "release-out/$apk" \
             "release-out/release-evidence.json" \
             "release-out/SHA256SUMS"
+
+      - name: Remove runner-local signing material
+        if: always()
+        run: |
+          set -euo pipefail
+          : "${RUNNER_TEMP:?RUNNER_TEMP must be set}"
+          rm -f -- "$RUNNER_TEMP/release.keystore"
