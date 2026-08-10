@@ -18,7 +18,7 @@
 # exercisable from a developer checkout (there is no key material to resolve).
 set -euo pipefail
 
-: "${RUNNER_TEMP:?RUNNER_TEMP must be set (GitHub-hosted runner env)}"
+: "${RUNNER_TEMP:?RUNNER_TEMP must be set (GitHub Actions runner env)}"
 : "${GITHUB_ENV:?GITHUB_ENV must be set (GitHub Actions env)}"
 : "${SIGNING_KEY_REFERENCE:?RELEASE_SIGNING_KEY_REFERENCE var is required}"
 

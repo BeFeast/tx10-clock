@@ -185,6 +185,50 @@ class PinnedToolchainMatchesBuildFiles(unittest.TestCase):
             self.assertRegex(inspector, r'grep -Fq "[^"\n]*\$%s' % field)
 
 
+class ReleaseWorkflowTopologyTests(unittest.TestCase):
+    def setUp(self):
+        path = os.path.join(ROOT, ".github", "workflows", "release.yml")
+        with open(path, "r", encoding="utf-8") as fh:
+            self.workflow = fh.read()
+
+    def test_only_signing_job_uses_the_dedicated_private_runner(self):
+        build = re.search(
+            r"(?ms)^  reproducible-build:\n(?P<body>.*?)(?=^  sign-and-publish:)",
+            self.workflow,
+        )
+        signing = re.search(
+            r"(?ms)^  sign-and-publish:\n(?P<body>.*)\Z", self.workflow
+        )
+        self.assertIsNotNone(build)
+        self.assertIsNotNone(signing)
+
+        build_body = build.group("body")
+        signing_body = signing.group("body")
+        self.assertEqual(
+            re.findall(r"(?m)^    runs-on: (.+)$", build_body), ["ubuntu-latest"]
+        )
+        self.assertNotIn("self-hosted", build_body)
+
+        runner = re.search(
+            r"(?m)^    runs-on:\n(?P<labels>(?:      - [^\n]+\n)+)",
+            signing_body,
+        )
+        self.assertIsNotNone(runner)
+        labels = re.findall(r"(?m)^      - ([^\n]+)$", runner.group("labels"))
+        self.assertEqual(
+            labels, ["self-hosted", "linux", "x64", "tx10-release-signing"]
+        )
+        self.assertIn("    needs: reproducible-build\n", signing_body)
+
+    def test_signing_material_is_cleaned_on_every_job_outcome(self):
+        self.assertRegex(
+            self.workflow,
+            r"(?ms)- name: Remove runner-local signing material\n"
+            r"        if: always\(\).*?"
+            r'rm -f -- "\$RUNNER_TEMP/release\.keystore"',
+        )
+
+
 class ToolchainSemanticsTests(unittest.TestCase):
     def test_each_pin_mismatch_is_reported(self):
         for field, bad in (
