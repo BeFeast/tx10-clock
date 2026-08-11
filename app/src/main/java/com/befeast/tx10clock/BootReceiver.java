@@ -17,10 +17,15 @@ import android.content.Intent;
  *   <li>the accepted config requests boot start.</li>
  * </ol>
  *
- * <p>It adds no root, overlay, launcher, kiosk, {@code DreamService}, or firmware
- * workaround. Reliable foreground start on the TX10's API 29 OEM firmware is a
- * later live gate; this class only performs a standard, permitted activity
- * launch.
+ * <p>This class only performs a standard activity launch and adds no root,
+ * launcher, kiosk, {@code DreamService}, or firmware workaround. It is not,
+ * however, sufficient on its own: on the TX10 Pro (Android 10 / API 29) the
+ * background-activity-launch restriction rejects an activity start from a
+ * {@code BOOT_COMPLETED} receiver unless the app is exempt. Delivery grants
+ * that exemption out of band by setting the {@code SYSTEM_ALERT_WINDOW}
+ * app-op during provisioning (see {@code docs/external-config.md} and
+ * {@code delivery/README.md}); the receiver itself requests no overlay window
+ * and never draws one.
  */
 public final class BootReceiver extends BroadcastReceiver {
 

@@ -138,7 +138,8 @@ class DeliveryHarness(unittest.TestCase):
     def env(self):
         env = {key: value for key, value in os.environ.items()
                if not key.startswith(("TX10_", "FAKE_ADB", "FAKE_CERT",
-                                      "FAKE_DEVICE", "FAKE_REBOOT", "FAKE_LOGCAT"))}
+                                      "FAKE_DEVICE", "FAKE_REBOOT", "FAKE_LOGCAT",
+                                      "FAKE_OVERLAY"))}
         env.update({
             "TX10_DELIVERY_MODE": "fixture",
             "TX10_ADB_TARGET": TARGET,
@@ -324,13 +325,24 @@ class EntrypointTests(DeliveryHarness):
         self.assertEqual(receipt["release_receipt"]["delivery_state"], "delivered")
         self.assertEqual(receipt["release_receipt"]["verification_state"], "passed")
         for key in ("package", "version", "signature", "installed_apk",
-                    "foreground_start", "screenshot", "system_render_time",
-                    "home_exit", "back_exit", "restart", "reboot_autostart", "soak"):
+                    "overlay_exemption", "foreground_start", "screenshot",
+                    "system_render_time", "home_exit", "back_exit", "restart",
+                    "reboot_autostart", "soak"):
             self.assertEqual(receipt["verification"][key], "passed", key)
         calls = self.calls()
         self.assertTrue(any(call[-3:-1] == ["install", "-r"] for call in calls))
         self.assertTrue(any(call[-1:] == ["reboot"] for call in calls))
         self.assertFalse(any("uninstall" in call for call in calls))
+        # The overlay exemption is granted after install and before the reboot
+        # so the BootReceiver's activity start survives the API 29 BAL check.
+        grant = next(i for i, call in enumerate(calls) if call[-6:] == [
+            "shell", "appops", "set", "com.befeast.tx10clock",
+            "SYSTEM_ALERT_WINDOW", "allow"])
+        install = next(i for i, call in enumerate(calls)
+                       if call[-3:-1] == ["install", "-r"])
+        reboot = next(i for i, call in enumerate(calls) if call[-1:] == ["reboot"])
+        self.assertLess(install, grant)
+        self.assertLess(grant, reboot)
         claim_dirs = list(self.state_dir.glob("claim-*"))
         self.assertEqual(len(claim_dirs), 1)
         release_receipt = claim_dirs[0] / "receipt.json"
@@ -352,6 +364,7 @@ class EntrypointTests(DeliveryHarness):
         private = json.loads((claim_dirs[0] / "private-evidence.json").read_text(
             encoding="utf-8"))
         self.assertEqual(private["result"], "passed")
+        self.assertEqual(private["overlay_exemption"], "allow")
         self.assertEqual(private["prior"]["version_name"], "0.0.9")
         self.assertEqual(private["prior"]["certificate_sha256"], CERT)
         self.assertEqual(private["prior"]["foreground_component"],
@@ -502,6 +515,42 @@ class EntrypointTests(DeliveryHarness):
         self.assertEqual(receipt["failure_stage"], "reboot")
         self.assertEqual(receipt["failure_code"], "foreground_mismatch")
         self.assertEqual(receipt["verification"]["reboot_autostart"], "pending")
+        # The overlay exemption still succeeded; a device that stays
+        # non-compliant despite it is caught at the reboot gate, not accepted.
+        self.assertEqual(receipt["verification"]["overlay_exemption"], "passed")
+        self.assertEqual(receipt["rollback"]["apk_restore"], "restored")
+        self.assert_no_leak(result)
+
+    def test_overlay_grant_failure_fails_closed_with_in_place_restore(self):
+        env = self.env()
+        env["FAKE_ADB_FAIL_KEY"] = (
+            "shell appops set com.befeast.tx10clock SYSTEM_ALERT_WINDOW allow")
+        result = self.run_delivery(env)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        receipt = self.receipt(result)
+        self.assertEqual(receipt["failure_stage"], "overlay_exemption")
+        self.assertEqual(receipt["failure_code"], "overlay_grant_failed")
+        self.assertEqual(receipt["verification"]["overlay_exemption"], "pending")
+        # A grant failure is a post-install failure: never reach the reboot and
+        # recover the box in place.
+        self.assertFalse(any(call[-1:] == ["reboot"] for call in self.calls()))
+        self.assertEqual(receipt["rollback"]["apk_restore"], "restored")
+        self.assertEqual(receipt["rollback"]["config_restore"], "restored")
+        self.assertFalse(any("uninstall" in call for call in self.calls()))
+        self.assert_no_leak(result)
+
+    def test_ineffective_overlay_grant_is_rejected(self):
+        env = self.env()
+        # The `appops set` returns success but `appops get` still reports the
+        # default (rejected) mode: delivery must verify the exemption took
+        # effect rather than trust the set command's exit code.
+        env["FAKE_OVERLAY_GET_MODE"] = "default"
+        result = self.run_delivery(env)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        receipt = self.receipt(result)
+        self.assertEqual(receipt["failure_stage"], "overlay_exemption")
+        self.assertEqual(receipt["failure_code"], "overlay_exemption_not_allowed")
+        self.assertFalse(any(call[-1:] == ["reboot"] for call in self.calls()))
         self.assertEqual(receipt["rollback"]["apk_restore"], "restored")
         self.assert_no_leak(result)
 

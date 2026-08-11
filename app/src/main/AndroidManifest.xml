@@ -42,7 +42,11 @@
 
         <!-- Restarts the clock after a reboot. It only auto-starts once the app
              has been opened at least once and the accepted config keeps
-             bootStart enabled (the default). No root/overlay/kiosk. -->
+             bootStart enabled (the default). On the TX10 Pro (API 29) the
+             background-activity-launch restriction blocks this start unless the
+             app is exempt; delivery provisions that exemption by granting the
+             SYSTEM_ALERT_WINDOW app-op (see docs/external-config.md and
+             delivery/README.md). No root, kiosk, or firmware modification. -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"

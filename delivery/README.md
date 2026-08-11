@@ -114,8 +114,9 @@ details:
 - public release/tag/APK/certificate identity,
 - target fingerprint and stage timestamps,
 - safe stage exit codes and failure code,
-- package/version/signature/installed-APK, foreground, screenshot, time/status,
-  Home/Back, restart, reboot-autostart, and soak results,
+- package/version/signature/installed-APK, overlay-exemption, foreground,
+  screenshot, time/status, Home/Back, restart, reboot-autostart, and soak
+  results,
 - rollback result enums, and
 - an explicitly separate `visual_acceptance` state, initially `pending`.
 
@@ -134,14 +135,34 @@ The live sequence is bounded by a 60-minute delivery deadline:
    signer, and existing config without changing the device;
 2. run `adb install -r` for the locked signed APK;
 3. publish the approval-bound config by same-directory temporary push and rename;
-4. prove package/version/signature and SHA-256 of the pulled installed APK;
-5. start the clock and verify foreground, `status.json`, system-time freshness,
+4. provision the boot-autostart exemption — grant `SYSTEM_ALERT_WINDOW`
+   (`adb shell appops set com.befeast.tx10clock SYSTEM_ALERT_WINDOW allow`) and
+   verify with `appops get` that the mode is `allow` (see below);
+5. prove package/version/signature and SHA-256 of the pulled installed APK;
+6. start the clock and verify foreground, `status.json`, system-time freshness,
    effective config, timezone, and a valid PNG screenshot;
-6. prove both Home and Back exit normally, then prove an explicit restart;
-7. perform a normal reboot and require standard boot autostart plus a boot-status
+7. prove both Home and Back exit normally, then prove an explicit restart;
+8. perform a normal reboot and require standard boot autostart plus a boot-status
    and screenshot check; and
-8. hold a full 30-minute soak, sampling the same PID, foreground/status, app PID
+9. hold a full 30-minute soak, sampling the same PID, foreground/status, app PID
    logcat, and package-specific system crash/ANR records.
+
+## Boot autostart provisioning (overlay exemption)
+
+On the stock TX10 Pro (Android 10 / API 29) a `BOOT_COMPLETED` receiver cannot
+foreground an activity: the background-activity-launch (BAL) restriction rejects
+the start and the box comes up in `com.android.puretv` instead of the clock.
+The exemption is the `SYSTEM_ALERT_WINDOW` overlay app-op. Delivery therefore
+grants it as an explicit provisioning step (4) right after install, rather than
+leaving it as an undocumented manual `appops` grant that a factory reset would
+silently drop.
+
+The step fails closed like any other post-install stage: if the grant command
+or its `appops get` verification fails, delivery never reaches the reboot check
+and restores the box in place. The app declares no overlay permission and draws
+no overlay window — the op is used solely as the documented BAL exemption, so no
+first-run consent screen is added. A factory-default box is provisioned entirely
+by re-running this procedure; no manual step is required.
 
 Before `adb install -r` is invoked, failure leaves the package/config unchanged.
 After install begins, the automated recovery path gets a separate bounded

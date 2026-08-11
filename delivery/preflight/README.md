@@ -67,3 +67,9 @@ installation is a separate exact-SHA, one-use approval path implemented by
 [`scripts/deliver.sh`](../../scripts/deliver.sh); see
 [`delivery/README.md`](../README.md). The preflight remains read-only even when
 invoked by that delivery entrypoint.
+
+The boot-autostart overlay exemption (`SYSTEM_ALERT_WINDOW`, the API 29
+background-activity-launch exemption) is **not** a preflight concern: the app is
+not yet installed at preflight time, and granting an app-op is a mutation.
+Delivery applies and verifies that grant after install; see the *Boot autostart
+provisioning* section of [`delivery/README.md`](../README.md).

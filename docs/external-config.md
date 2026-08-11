@@ -199,10 +199,27 @@ rejected input, or secrets.
    defaults), and
 3. launches the clock activity only when `bootStart` is enabled.
 
-The receiver adds no root, overlay, launcher, kiosk, `DreamService`, or firmware
-workaround. Reliable foreground auto-start on the TX10's API 29 OEM firmware
-remains a separate live gate. The only permission the app declares for this is
-the normal `RECEIVE_BOOT_COMPLETED`.
+The receiver adds no root, launcher, kiosk, `DreamService`, or firmware
+workaround, and the only permission the app *declares* is the normal
+`RECEIVE_BOOT_COMPLETED`.
+
+On the stock TX10 Pro (Android 10 / API 29) that is not sufficient on its own:
+the background-activity-launch (BAL) restriction rejects the receiver's
+`startActivity` after a reboot unless the app is exempt, so the box comes up in
+its launcher instead of the clock. The exemption is the `SYSTEM_ALERT_WINDOW`
+overlay app-op. Rather than declare that permission and add a first-run consent
+screen (poor TV UX), delivery **provisions the exemption once**, right after
+install, with:
+
+```
+adb shell appops set com.befeast.tx10clock SYSTEM_ALERT_WINDOW allow
+```
+
+Delivery grants this, verifies it with `appops get`, and only then proves boot
+autostart — see [`delivery/README.md`](../delivery/README.md). The app requests
+no overlay window and never draws one; the op is used solely as the documented
+BAL exemption. A factory reset clears the grant, so re-running the documented
+install/provisioning procedure re-applies it.
 
 ## Permissions & offline
 

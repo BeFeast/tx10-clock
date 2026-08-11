@@ -49,6 +49,14 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = "com.befeast.tx10clock"
 ACTIVITY = PACKAGE + "/.MainActivity"
+# Android 10 (API 29) restricts background activity launches. A BOOT_COMPLETED
+# receiver cannot foreground an activity on the stock TX10 Pro firmware unless
+# the app holds a background-activity-launch exemption; granting the
+# SYSTEM_ALERT_WINDOW app-op is the exemption the operator confirmed live, so
+# delivery provisions it explicitly instead of relying on an undocumented
+# manual `appops` grant. See delivery/README.md and docs/external-config.md.
+OVERLAY_APPOP = "SYSTEM_ALERT_WINDOW"
+APPOP_MODES = ("allow", "deny", "ignore", "default")
 REPOSITORY = "BeFeast/tx10-clock"
 RELEASE_TAG = "v0.1.0"
 RELEASE_LOCK = ROOT / "delivery" / "release-lock.json"
@@ -56,7 +64,7 @@ RELEASE_EVIDENCE_NAME = "release-evidence.json"
 RECEIPT_VALIDATOR = ROOT / "tools" / "receipt" / "validate_receipt.py"
 FIXTURE_ADB = ROOT / "tools" / "delivery" / "tests" / "fake_adb.py"
 FIXTURE_ADB_SHA256 = (
-    "5bc07acbe752c84a5ea891982fc25b75ba20afb715df86851921d7f14b5353cd")
+    "bcabee81d6b1bdab54021edd67bdab5e7512f8c40d487b0c80c51b84a290652e")
 FIXTURE_TARGET = "tx10-delivery-fixture"
 CONFIG_DIR = "/sdcard/Android/data/com.befeast.tx10clock/files"
 CONFIG_REMOTE = CONFIG_DIR + "/config.json"
@@ -579,7 +587,8 @@ def safe_delivery_record_base() -> Dict[str, Any]:
         "exit_results": {},
         "verification": {
             "package": "pending", "version": "pending", "signature": "pending",
-            "installed_apk": "pending", "foreground_start": "pending",
+            "installed_apk": "pending", "overlay_exemption": "pending",
+            "foreground_start": "pending",
             "screenshot": "pending", "system_render_time": "pending",
             "home_exit": "pending", "back_exit": "pending", "restart": "pending",
             "reboot_autostart": "pending", "soak": "pending",
@@ -646,6 +655,7 @@ class Delivery:
             "release_lock_sha256": None,
             "config_sha256": None,
             "prior": None,
+            "overlay_exemption": None,
             "screenshots": {},
             "rollback": None,
             "result": "executing",
@@ -1321,6 +1331,43 @@ class Delivery:
                     "config_publish_failed")
         self._record(stage)
 
+    @staticmethod
+    def _parse_appop_mode(text: str) -> Optional[str]:
+        """Extract the mode from `appops get <pkg> <op>` output. The line shape
+        varies by API level ("SYSTEM_ALERT_WINDOW: allow", "allow; time=...",
+        or "default; rejectTime=..."), so read the first recognized mode token
+        rather than assuming a fixed layout."""
+        for token in re.split(r"[\s:;,]+", text.strip()):
+            if token in APPOP_MODES:
+                return token
+        return None
+
+    def provision_overlay_exemption(self) -> None:
+        """Grant and verify the background-activity-launch exemption.
+
+        On the stock TX10 Pro (API 29) the BootReceiver's activity start is
+        rejected after reboot unless the app is exempt from the background
+        activity launch restriction. Granting the SYSTEM_ALERT_WINDOW app-op is
+        that exemption; it is applied here, right after install, so boot-to-clock
+        is a delivery-verified provisioning step rather than an undocumented
+        manual grant that a factory reset would silently drop. A failure here is
+        a post-install failure and is recovered by the standard in-place
+        rollback path."""
+        stage = "overlay_exemption"
+        self.adb_ok(
+            ["shell", "appops", "set", PACKAGE, OVERLAY_APPOP, "allow"], stage,
+            "overlay_grant_failed")
+        result = self.adb_ok(
+            ["shell", "appops", "get", PACKAGE, OVERLAY_APPOP], stage,
+            "overlay_query_failed")
+        if self._parse_appop_mode(decoded(result.stdout)) != "allow":
+            raise DeliveryFailure(stage, "overlay_exemption_not_allowed")
+        self.receipt["verification"]["overlay_exemption"] = "passed"
+        self.private_evidence["overlay_exemption"] = "allow"
+        if not self._write_private_evidence():
+            raise DeliveryFailure(stage, "private_evidence_write_failed")
+        self._record(stage)
+
     def verify_installed_identity(self, work: Path) -> None:
         stage = "installed_identity"
         packages = self.adb_ok(
@@ -1680,6 +1727,7 @@ class Delivery:
             self.claim()
             self.snapshot_prior()
             self.install_and_configure()
+            self.provision_overlay_exemption()
             self.verify_installed_identity(Path(work_context.name))
             self.launch_and_verify(False, "after-install.png")
             self.verify_navigation_and_restart()

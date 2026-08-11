@@ -35,6 +35,7 @@ def load_state(root):
         "foreground": PRIOR,
         "rebooted": False,
         "config_published": False,
+        "overlay_granted": False,
         "counts": {},
     }
     save_state(root, state)
@@ -179,6 +180,16 @@ def main(argv):
     elif args == ["shell", "am", "start", "-W", "-n", ACTIVITY]:
         state["foreground"] = ACTIVITY
         out = "Status: ok\nActivity: " + ACTIVITY + "\n"
+    elif args == ["shell", "appops", "set", PACKAGE, "SYSTEM_ALERT_WINDOW", "allow"]:
+        state["overlay_granted"] = True
+    elif args == ["shell", "appops", "get", PACKAGE, "SYSTEM_ALERT_WINDOW"]:
+        # An override lets a test model a device where the grant does not take
+        # effect (get still reports "default"); otherwise reflect the op state.
+        mode = os.environ.get("FAKE_OVERLAY_GET_MODE", "")
+        if not mode:
+            mode = "allow" if state["overlay_granted"] else "default"
+        out = ("SYSTEM_ALERT_WINDOW: allow\n" if mode == "allow"
+               else "SYSTEM_ALERT_WINDOW: default; rejectTime=+5m25s ago\n")
     elif args == ["shell", "am", "force-stop", PACKAGE]:
         state["foreground"] = None
     elif args == ["shell", "input", "keyevent", "KEYCODE_HOME"]:
@@ -197,8 +208,13 @@ def main(argv):
             binary = PNG
     elif args == ["reboot"]:
         state["rebooted"] = True
-        state["foreground"] = (
-            ACTIVITY if os.environ.get("FAKE_REBOOT_AUTOSTART", "1") == "1" else HOME)
+        # Model Android 10's background-activity-launch restriction: after a
+        # reboot the BootReceiver can only foreground the clock when the overlay
+        # exemption was granted during delivery. FAKE_REBOOT_AUTOSTART=0 forces
+        # the rejection even when granted (a device that stays non-compliant).
+        autostart = (state["overlay_granted"]
+                     and os.environ.get("FAKE_REBOOT_AUTOSTART", "1") == "1")
+        state["foreground"] = ACTIVITY if autostart else HOME
     elif args == ["wait-for-device"]:
         pass
     elif args == ["shell", "getprop", "sys.boot_completed"]:
