@@ -159,7 +159,10 @@ silently drop.
 
 The step fails closed like any other post-install stage: if the grant command
 or its `appops get` verification fails, delivery never reaches the reboot check
-and restores the box in place. The app declares no overlay permission and draws
+and restores the box in place. Provisioning first records the app-op mode it is
+about to overwrite, so in-place recovery from any post-install failure puts that
+exact mode back and verifies it — a rejected delivery never leaves the granted
+exemption on the device. The app declares no overlay permission and draws
 no overlay window — the op is used solely as the documented BAL exemption, so no
 first-run consent screen is added. A factory-default box is provisioned entirely
 by re-running this procedure; no manual step is required.
@@ -169,7 +172,10 @@ After install begins, the automated recovery path gets a separate bounded
 five-minute window and may only:
 
 - run `adb install -r` with the captured prior APK,
-- atomically replace the config with the captured prior config, and
+- atomically replace the config with the captured prior config,
+- restore the `SYSTEM_ALERT_WINDOW` app-op to the exact mode captured before the
+  grant (so a rejected delivery never leaves the exemption behind) and verify it,
+  and
 - start the captured prior foreground activity.
 
 It never runs `adb uninstall`, never deletes a newly created package/config to

@@ -554,6 +554,39 @@ class EntrypointTests(DeliveryHarness):
         self.assertEqual(receipt["rollback"]["apk_restore"], "restored")
         self.assert_no_leak(result)
 
+    def test_failed_delivery_rollback_reverts_overlay_exemption(self):
+        # The grant succeeds, then a later check fails: rollback must put the
+        # SYSTEM_ALERT_WINDOW app-op back to the exact prior mode so a rejected
+        # delivery never leaves the box with a granted boot-launch exemption.
+        env = self.env()
+        env["FAKE_ADB_FAIL_KEY"] = "exec-out screencap -p"
+        result = self.run_delivery(env)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        receipt = self.receipt(result)
+        self.assertEqual(receipt["failure_stage"], "foreground")
+        # The grant itself was applied and verified before the failure.
+        self.assertEqual(receipt["verification"]["overlay_exemption"], "passed")
+        # Rollback restored the prior mode and the disposition reflects a clean
+        # in-place restore.
+        self.assertEqual(receipt["rollback"]["overlay_restore"], "restored")
+        self.assertEqual(receipt["rollback"]["disposition"],
+                         "in_place_restore_completed")
+        # The rollback issued an explicit `appops set ... default` (the captured
+        # prior mode), and the device ends at that mode rather than `allow`.
+        calls = self.calls()
+        self.assertTrue(any(
+            call[-6:] == ["shell", "appops", "set", "com.befeast.tx10clock",
+                          "SYSTEM_ALERT_WINDOW", "default"]
+            for call in calls))
+        final_state = json.loads(
+            (self.fake_dir / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual(final_state["overlay_mode"], "default")
+        claim_dir = next(self.state_dir.glob("claim-*"))
+        private = json.loads(
+            (claim_dir / "private-evidence.json").read_text(encoding="utf-8"))
+        self.assertEqual(private["rollback"]["overlay_restore"], "restored")
+        self.assert_no_leak(result)
+
     def test_absent_prior_package_and_config_are_never_deleted(self):
         env = self.env()
         env["FAKE_PRIOR_PACKAGE_PRESENT"] = "0"

@@ -35,7 +35,7 @@ def load_state(root):
         "foreground": PRIOR,
         "rebooted": False,
         "config_published": False,
-        "overlay_granted": False,
+        "overlay_mode": "default",
         "counts": {},
     }
     save_state(root, state)
@@ -180,16 +180,19 @@ def main(argv):
     elif args == ["shell", "am", "start", "-W", "-n", ACTIVITY]:
         state["foreground"] = ACTIVITY
         out = "Status: ok\nActivity: " + ACTIVITY + "\n"
-    elif args == ["shell", "appops", "set", PACKAGE, "SYSTEM_ALERT_WINDOW", "allow"]:
-        state["overlay_granted"] = True
+    elif (len(args) == 6 and args[:5] == ["shell", "appops", "set", PACKAGE,
+                                          "SYSTEM_ALERT_WINDOW"]):
+        # Persist whatever mode is set so rollback can put the prior mode back
+        # (delivery grants "allow"; recovery restores the captured prior mode).
+        state["overlay_mode"] = args[5]
     elif args == ["shell", "appops", "get", PACKAGE, "SYSTEM_ALERT_WINDOW"]:
         # An override lets a test model a device where the grant does not take
         # effect (get still reports "default"); otherwise reflect the op state.
         mode = os.environ.get("FAKE_OVERLAY_GET_MODE", "")
         if not mode:
-            mode = "allow" if state["overlay_granted"] else "default"
+            mode = state["overlay_mode"]
         out = ("SYSTEM_ALERT_WINDOW: allow\n" if mode == "allow"
-               else "SYSTEM_ALERT_WINDOW: default; rejectTime=+5m25s ago\n")
+               else "SYSTEM_ALERT_WINDOW: " + mode + "; rejectTime=+5m25s ago\n")
     elif args == ["shell", "am", "force-stop", PACKAGE]:
         state["foreground"] = None
     elif args == ["shell", "input", "keyevent", "KEYCODE_HOME"]:
@@ -212,7 +215,7 @@ def main(argv):
         # reboot the BootReceiver can only foreground the clock when the overlay
         # exemption was granted during delivery. FAKE_REBOOT_AUTOSTART=0 forces
         # the rejection even when granted (a device that stays non-compliant).
-        autostart = (state["overlay_granted"]
+        autostart = (state["overlay_mode"] == "allow"
                      and os.environ.get("FAKE_REBOOT_AUTOSTART", "1") == "1")
         state["foreground"] = ACTIVITY if autostart else HOME
     elif args == ["wait-for-device"]:

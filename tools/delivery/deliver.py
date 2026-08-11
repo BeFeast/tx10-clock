@@ -64,7 +64,7 @@ RELEASE_EVIDENCE_NAME = "release-evidence.json"
 RECEIPT_VALIDATOR = ROOT / "tools" / "receipt" / "validate_receipt.py"
 FIXTURE_ADB = ROOT / "tools" / "delivery" / "tests" / "fake_adb.py"
 FIXTURE_ADB_SHA256 = (
-    "bcabee81d6b1bdab54021edd67bdab5e7512f8c40d487b0c80c51b84a290652e")
+    "378f09cae6b7d9a36c33b1e485e43016554a4c30ecf97a07ad21d02de9df490b")
 FIXTURE_TARGET = "tx10-delivery-fixture"
 CONFIG_DIR = "/sdcard/Android/data/com.befeast.tx10clock/files"
 CONFIG_REMOTE = CONFIG_DIR + "/config.json"
@@ -598,6 +598,7 @@ def safe_delivery_record_base() -> Dict[str, Any]:
         "rollback": {
             "required": False, "apk_restore": "not_needed",
             "config_restore": "not_needed", "foreground_restore": "not_needed",
+            "overlay_restore": "not_needed",
             "disposition": "not_needed",
         },
     }
@@ -646,6 +647,7 @@ class Delivery:
             "installed": False, "apk_backup": None, "config_present": False,
             "config_backup": None, "foreground": None, "apk_sha256": None,
             "certificate_sha256": None, "version_name": None, "version_code": None,
+            "overlay_mode": None,
         }
         self.private_evidence: Dict[str, Any] = {
             "schema": "tx10-private-delivery-evidence/v1",
@@ -1352,8 +1354,15 @@ class Delivery:
         is a delivery-verified provisioning step rather than an undocumented
         manual grant that a factory reset would silently drop. A failure here is
         a post-install failure and is recovered by the standard in-place
-        rollback path."""
+        rollback path, which restores the app-op mode captured just below so a
+        rejected delivery never leaves the box with a granted exemption."""
         stage = "overlay_exemption"
+        # Capture the exact app-op mode we are about to overwrite so rollback can
+        # put it back rather than leaving the newly granted exemption in place.
+        before = self.adb_ok(
+            ["shell", "appops", "get", PACKAGE, OVERLAY_APPOP], stage,
+            "overlay_prior_query_failed")
+        self.prior["overlay_mode"] = self._parse_appop_mode(decoded(before.stdout))
         self.adb_ok(
             ["shell", "appops", "set", PACKAGE, OVERLAY_APPOP, "allow"], stage,
             "overlay_grant_failed")
@@ -1650,16 +1659,41 @@ class Delivery:
                 foreground_status = "not_available"
         except DeliveryFailure:
             foreground_status = "failed"
+        overlay_status = "not_needed"
+        try:
+            prior_mode = self.prior.get("overlay_mode")
+            if isinstance(prior_mode, str) and prior_mode in APPOP_MODES:
+                # Only reached once provisioning captured a prior mode, i.e. we
+                # were about to (or did) grant the exemption. Put the exact mode
+                # back and confirm it, so a rejected delivery cannot leave the
+                # boot-launch exemption persisted.
+                set_result = self.adb(
+                    ["shell", "appops", "set", PACKAGE, OVERLAY_APPOP, prior_mode],
+                    stage)
+                if set_result.returncode == 0:
+                    check = self.adb(
+                        ["shell", "appops", "get", PACKAGE, OVERLAY_APPOP], stage)
+                    observed = (self._parse_appop_mode(decoded(check.stdout))
+                                if check.returncode == 0 else None)
+                    overlay_status = "restored" if observed == prior_mode else "failed"
+                else:
+                    overlay_status = "failed"
+            else:
+                overlay_status = "not_available"
+        except DeliveryFailure:
+            overlay_status = "failed"
         self.receipt["rollback"].update({
             "apk_restore": apk_status,
             "config_restore": config_status,
             "foreground_restore": foreground_status,
+            "overlay_restore": overlay_status,
         })
         restored = (
             self.prior["installed"] is True
             and apk_status == "restored"
             and self.prior["config_present"] is True
             and config_status == "restored"
+            and overlay_status in ("restored", "not_available")
         )
         if restored:
             disposition = "in_place_restore_completed"
@@ -1672,6 +1706,7 @@ class Delivery:
             "apk_restore": apk_status,
             "config_restore": config_status,
             "foreground_restore": foreground_status,
+            "overlay_restore": overlay_status,
             "disposition": disposition,
         }
         self._write_private_evidence()
