@@ -1,0 +1,43 @@
+name: TX10ClockTV
+options:
+  createIntermediateGroups: true
+  deploymentTarget:
+    tvOS: "17.0"
+
+packages:
+  TX10ClockCore:
+    path: Core
+
+targets:
+  TX10ClockTV:
+    type: application
+    platform: tvOS
+    deploymentTarget: "17.0"
+    sources:
+      - App/Sources
+    dependencies:
+      - package: TX10ClockCore
+        product: TX10ClockCore
+    settings:
+      base:
+        INFOPLIST_FILE: App/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        PRODUCT_BUNDLE_IDENTIFIER: com.befeast.tx10clock.tv
+        TARGETED_DEVICE_FAMILY: 3
+        SWIFT_VERSION: "5.9"
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+        CODE_SIGN_STYLE: Automatic
+        # Resolved from the TX10_TEAM_ID build setting passed on the
+        # xcodebuild command line by scripts/m4-build-install.sh.
+        DEVELOPMENT_TEAM: $(TX10_TEAM_ID)
+
+schemes:
+  TX10ClockTV:
+    build:
+      targets:
+        TX10ClockTV: all
+    run:
+      config: Debug
+    archive:
+      config: Release
