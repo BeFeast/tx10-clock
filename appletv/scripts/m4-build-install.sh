@@ -103,12 +103,31 @@ the paid program — check the Membership page says 'Apple Developer Program',
 not which id it is."
 fi
 
+# A generic destination cannot auto-register the Apple TV in the developer
+# portal, and a team with zero registered tvOS devices then fails with "Your
+# team has no devices from which to generate a provisioning profile". Building
+# against the concrete device lets -allowProvisioningDeviceRegistration
+# register its UDID on first build. TX10_ATV_UDID is the hardware UDID (the
+# 40-hex "Identifier" in Xcode's Devices window — NOT the dashed devicectl
+# CoreDevice UUID); when unset we try to derive it from TX10_ATV_ID.
+if [[ -z "${TX10_ATV_UDID:-}" && -n "${TX10_ATV_ID:-}" ]]; then
+  TX10_ATV_UDID="$(xcrun devicectl device info details --device "$TX10_ATV_ID" 2>/dev/null \
+    | awk -F': *' 'tolower($1) ~ /udid/ { print $2; exit }' || true)"
+fi
+if [[ -n "${TX10_ATV_UDID:-}" ]]; then
+  DESTINATION="platform=tvOS,id=$TX10_ATV_UDID"
+  note "Building against device $TX10_ATV_UDID (registers it in the portal on first build)"
+else
+  DESTINATION="generic/platform=tvOS"
+  note "TX10_ATV_UDID/TX10_ATV_ID not set — generic destination; this FAILS on a team with no registered tvOS devices"
+fi
+
 note "Building Release for tvOS (team $TX10_TEAM_ID)"
 ( cd "$APPLETV_DIR" && xcodebuild \
     -project TX10ClockTV.xcodeproj \
     -scheme TX10ClockTV \
     -configuration Release \
-    -destination 'generic/platform=tvOS' \
+    -destination "$DESTINATION" \
     -derivedDataPath .build-xcode \
     -allowProvisioningUpdates \
     -allowProvisioningDeviceRegistration \
