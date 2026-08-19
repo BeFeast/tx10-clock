@@ -92,12 +92,15 @@ note "Generating TX10ClockTV.xcodeproj from project.yml"
 
 if [[ -z "${TX10_TEAM_ID:-}" ]]; then
   die "TX10_TEAM_ID is not set.
-Export the ten-character *paid* Apple Developer team id, e.g.:
+Export the ten-character Apple Developer team id of a team with a *paid*
+Apple Developer Program membership (1-year provisioning; a free personal
+team signs 7-day profiles and the clock would die weekly):
   export TX10_TEAM_ID=XXXXXXXXXX
-This must be the paid team (1-year provisioning), NOT the free personal team
-from the t3code iPhone build (that one expires every 7 days and has device
-limits). Find it at developer.apple.com > Account > Membership, or in the
-'listTeams' section of a previous xcodebuild -allowProvisioningUpdates log."
+Find it at developer.apple.com > Account > Membership details, or in the
+'listTeams' section of a previous xcodebuild -allowProvisioningUpdates log.
+Note: a personal team KEEPS its Team ID when the same Apple ID enrolls in
+the paid program — check the Membership page says 'Apple Developer Program',
+not which id it is."
 fi
 
 note "Building Release for tvOS (team $TX10_TEAM_ID)"

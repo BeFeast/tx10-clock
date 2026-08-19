@@ -24,7 +24,7 @@ t3code-on-M4 workflow).
 | Boot start | No tvOS equivalent of `BOOT_COMPLETED`; requirement explicitly dropped by the operator (2026-08-19). After sleep the Apple TV resumes the foreground app; after power loss the app is launched with the remote. |
 | Keep-awake | `isIdleTimerDisabled = true` plus a defensive 60 s re-toggle (API regressed in tvOS 11.2/14.6/26). Device-side: Sleep After = Never, auto-updates off. |
 | Tick sound | New optional config key `tickSound: "off"\|"minute"\|"second"` (default `minute`), tvOS-only schema extension. Continuous `AVAudioEngine` output (silence between ticks keeps the Bluetooth soundbar's link streaming) + a gentle ~35 ms 880 Hz synthesized tick. Android ignores/rejects this key — configs are per-device. |
-| Signing | Paid Apple Developer team (1-year development profile). `DEVELOPMENT_TEAM` comes from `TX10_TEAM_ID` env; never the free personal team used by the 2026-07 t3code build. Annual re-sign = rerun the build script. |
+| Signing | Paid Apple Developer Program team (1-year development profile). `DEVELOPMENT_TEAM` comes from `TX10_TEAM_ID` env. The operator's team kept its Team ID when the Apple ID enrolled in the paid program (2026-08, renewal 2027-08-06) — verify paid status on the Membership page, not by the id. Annual re-sign = rerun the build script. |
 | Build host | Operator-run on the corporate MacBook M4 Pro: clone from Forgejo over SSH, `./appletv/scripts/m4-build-install.sh`. No CI for tvOS in v0. |
 
 ## Phases

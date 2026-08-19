@@ -108,11 +108,14 @@ silent, `"second"` ticks every second. Any other value rejects the document
 - **App installed but won't launch after first install** — launch it once from
   the Apple TV home screen and accept the developer trust prompt, then rerun
   the script (or the launch command it prints).
-- **Free personal team vs paid team** — a free team (like the one used for the
-  t3code iPhone build) signs with 7-day profiles and tight device limits; the
-  clock would die weekly. Use the paid team id for `TX10_TEAM_ID`. If you do
-  not know it, it also appears in the `listTeams` section of an
-  `xcodebuild -allowProvisioningUpdates` log.
+- **Free personal team vs paid team** — a team without a paid membership signs
+  with 7-day profiles and tight device limits; the clock would die weekly. Use
+  a team whose Membership page says "Apple Developer Program" for
+  `TX10_TEAM_ID`. The Team ID itself does not change when an Apple ID enrolls
+  in the paid program, so an id previously seen as a "personal team" may now be
+  the paid one — the membership page (developer.apple.com > Account >
+  Membership details) is the source of truth. It also appears in the
+  `listTeams` section of an `xcodebuild -allowProvisioningUpdates` log.
 - **Apple TV not listed by `devicectl`** — it must run tvOS 17+ (older devices
   report unsupported pairing), be awake, on the same LAN, and paired via the
   Devices and Simulators window (see Prerequisites).
