@@ -312,11 +312,14 @@ public struct ExternalConfig: Equatable, Hashable {
         // Deviation from the Android build: TimeZone(identifier:) accepts IANA
         // ids only, so bare offset forms like "+05:00" that java.time ZoneId
         // would accept are rejected on tvOS.
-        guard let resolved = TimeZone(identifier: zone) else {
+        guard TimeZone(identifier: zone) != nil else {
             throw ConfigError(reason: ConfigError.outOfRange,
                               message: "unknown timeZone '\(zone)'")
         }
-        return resolved.identifier
+        // Keep the operator's string verbatim (java ZoneId.of(z).getId() returns
+        // the input for valid IANA ids). Foundation's own normalization is
+        // platform-dependent — Darwin rewrites "UTC" to "GMT", Linux does not.
+        return zone
     }
 
     private static func requireColorName(_ map: [String: JSONValue], _ key: String) throws -> String {
