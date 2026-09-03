@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "tx10-clock"
 include ':app'
+include ':linux'
