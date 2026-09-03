@@ -67,8 +67,45 @@ Missing weights fall back to Roboto Regular, then to the JDK logical sans font.
 
 If the target is only reachable via a jump host, set `TX10CLOCK_SSH_HOP=user@hop`.
 
-Reboot persistence on a fresh Alpine host: add an
-`/etc/local.d/tx10-clock.start` script that starts `Xorg :0 -sharevts -noreset`
-and then the jar with `DISPLAY=:0`, enable the `local` service
-(`rc-update add local default`). Auto-restart supervision (`supervise-daemon`)
-is a planned follow-up.
+Reboot persistence on a fresh Alpine host: run X and the jar under OpenRC's
+`supervise-daemon` (both auto-restart, both in the default runlevel):
+
+`/etc/init.d/tx10-clock-x`:
+
+```sh
+#!/sbin/openrc-run
+supervisor="supervise-daemon"
+name="tx10-clock X server"
+command="/usr/bin/Xorg"
+# -s 0 -dpms: never blank — this is a display, idle timers must stay off
+command_args=":0 -sharevts -noreset -s 0 -dpms"
+pidfile="/run/tx10-clock-x.pid"
+output_log="/tmp/xorg-sup.log"
+error_log="/tmp/xorg-sup.err"
+
+depend() {
+	after local
+}
+```
+
+`/etc/init.d/tx10-clock`:
+
+```sh
+#!/sbin/openrc-run
+supervisor="supervise-daemon"
+name="tx10-clock kiosk"
+command="/usr/bin/java"
+command_args="-jar /root/tx10-clock-linux.jar"
+pidfile="/run/tx10-clock.pid"
+output_log="/tmp/clock.log"
+error_log="/tmp/clock.err"
+export DISPLAY=:0
+
+depend() {
+	need tx10-clock-x
+}
+```
+
+Then `rc-update add tx10-clock-x default && rc-update add tx10-clock default`.
+Manage with `rc-service tx10-clock stop|restart` — do not `pkill` by name (a
+name pattern matches the supervisor too).
