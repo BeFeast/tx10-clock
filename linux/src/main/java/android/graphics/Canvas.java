@@ -68,8 +68,15 @@ public final class Canvas {
     }
 
     public void drawColor(int color) {
+        // Android semantics: drawColor ignores the current matrix and fills the
+        // whole bound surface in device space. ClockView's burn-in translation
+        // relies on this ("the background fill inside render() ignores the
+        // matrix"), so a shifted composition never exposes an unpainted edge.
+        AffineTransform saved = g.getTransform();
+        g.setTransform(new AffineTransform());
         g.setColor(new Color(color, true));
         g.fillRect(0, 0, width, height);
+        g.setTransform(saved);
     }
 
     public void drawLine(float x1, float y1, float x2, float y2, Paint paint) {

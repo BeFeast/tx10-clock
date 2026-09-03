@@ -11,6 +11,7 @@ import com.befeast.tx10clock.TimeSource;
 
 import java.awt.AWTException;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Graphics;
@@ -125,6 +126,10 @@ public final class Main {
     // ------------------------------------------------------------------
 
     private static void runKiosk() {
+        Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
+            System.err.println("uncaught on " + t + ": " + e);
+            e.printStackTrace();
+        });
         Runtime rt;
         try {
             rt = new Runtime(configDir());
@@ -151,9 +156,14 @@ public final class Main {
             }
         };
         panel.setOpaque(true);
+        panel.setBackground(Color.BLACK);
 
         JFrame frame = new JFrame("tx10-clock");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        // Any sliver the AWT window may not cover (X11 fullscreen quirks) must
+        // read as part of the clock, i.e. black.
+        frame.getContentPane().setBackground(Color.BLACK);
+        frame.setBackground(Color.BLACK);
         frame.setUndecorated(true);
         frame.setContentPane(panel);
         frame.setCursor(blankCursor());
@@ -172,7 +182,13 @@ public final class Main {
             frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
             frame.setVisible(true);
         }
+        // Force exact screen coverage: X11 AWT fullscreen may leave edge
+        // slivers if the window is laid out from stale bounds.
+        frame.setBounds(device.getDefaultConfiguration().getBounds());
+        frame.validate();
         panel.revalidate();
+        System.out.println("kiosk: fullscreen=" + (device.getFullScreenWindow() == frame)
+                + " frame=" + frame.getBounds() + " panel=" + panel.getSize());
 
         // One tick per second: hands/seconds advance, config polled, status written.
         new Timer(1000, e -> {
