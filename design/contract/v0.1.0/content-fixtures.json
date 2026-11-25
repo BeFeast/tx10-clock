@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "locale": "en-US",
+  "zone": "Asia/Jerusalem",
+  "instant": "2026-07-12T22:09:42+03:00",
+  "twelve_hour": {
+    "main": "10:09",
+    "secondary": "PM SUN, JUL 12 42"
+  },
+  "twenty_four_hour": {
+    "main": "22:09",
+    "secondary": "SUN, JUL 12 42"
+  },
+  "assertions": {
+    "main_seconds_forbidden": true,
+    "secondary_seconds_required": true,
+    "twelve_hour_ampm_required": true,
+    "twenty_four_hour_ampm_forbidden": true,
+    "calendar_grid_forbidden": true,
+    "hebrew_date_forbidden": true
+  }
+}

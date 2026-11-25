@@ -1,0 +1,124 @@
+package com.befeast.tx10clock;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.KeyEvent;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.FrameLayout;
+
+import java.io.IOException;
+import java.time.ZoneId;
+
+/**
+ * Single full-screen Activity that hosts the {@link ClockView}. Built on the
+ * plain framework {@link Activity} (no AndroidX) to keep the APK minimal and
+ * free of extra native dependencies.
+ *
+ * <p>The shell is immersive and keeps the screen on, but is otherwise an
+ * ordinary activity: Home and Back behave normally so the clock is never a kiosk
+ * and can always be exited. On every resume it reloads the app-owned external
+ * config (last-known-good on rejection) and re-publishes the verifier-safe
+ * {@code status.json}.
+ *
+ * <p>The sleep layer ({@link SleepScreen}) sits over the clock: OK opens the sleep plan, and during
+ * a sleep session started from here the clock is not drawn until the explicit wake action.
+ */
+public final class MainActivity extends Activity {
+
+    /** Set true on the launch intent when started by {@link BootReceiver}. */
+    public static final String EXTRA_FROM_BOOT = "com.befeast.tx10clock.FROM_BOOT";
+
+    private static final String TAG = "Tx10Clock";
+
+    private ClockView clockView;
+    private SleepScreen sleepScreen;
+    private ConfigStore configStore;
+    private boolean launchedFromBoot;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        launchedFromBoot = getIntent() != null
+                && getIntent().getBooleanExtra(EXTRA_FROM_BOOT, false);
+
+        // Record that delivery has now opened the app at least once; this is the
+        // gate the boot receiver checks before auto-starting on later boots.
+        AppState.markLaunchedOnce(this);
+
+        configStore = new ConfigStore(ConfigDir.resolve(this));
+
+        // A clock should never let the TV blank out.
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        clockView = new ClockView(this);
+        clockView.setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+        FrameLayout root = new FrameLayout(this);
+        root.addView(clockView, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+        sleepScreen = new SleepScreen(this, root, clockView);
+        setContentView(root);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        // Reload after any atomic config replacement that happened while paused,
+        // then apply the strictly validated settings and re-publish status.
+        ExternalConfig config = configStore.reload();
+        clockView.apply(ClockConfig.fromExternal(config), timeSourceFor(config));
+        sleepScreen.setZone(config.resolveZone(ZoneId.systemDefault()));
+        if (!sleepScreen.sessionActive()) {
+            clockView.start();
+        }
+        sleepScreen.refresh();
+        sleepScreen.start();
+        publishStatus();
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (sleepScreen.onKeyDown(keyCode)) {
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == SleepScreen.REQUEST_DREMLA) {
+            sleepScreen.onDremlaResult(resultCode, data);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        clockView.stop();
+        sleepScreen.stop();
+    }
+
+    private static TimeSource timeSourceFor(ExternalConfig config) {
+        ZoneId zone = config.resolveZone(ZoneId.systemDefault());
+        return TimeSource.systemInZone(zone);
+    }
+
+    private void publishStatus() {
+        try {
+            configStore.writeStatus(launchedFromBoot);
+        } catch (IOException e) {
+            // status.json is diagnostic only; never let a write failure disturb
+            // the clock itself.
+            Log.w(TAG, "could not write status.json");
+        }
+    }
+}

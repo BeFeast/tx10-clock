@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android TV home-screen banner (320x180 aspect). Vector so no binary asset
+     is committed and the APK carries no density-specific PNGs. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path
+        android:fillColor="#0E1726"
+        android:pathData="M0,0h320v180h-320z" />
+    <path
+        android:strokeColor="#4FC3F7"
+        android:strokeWidth="6"
+        android:fillColor="#00000000"
+        android:pathData="M70,90m-52,0a52,52 0,1 1,104 0a52,52 0,1 1,-104 0" />
+    <path
+        android:strokeColor="#ECEFF4"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:pathData="M70,90L70,52" />
+    <path
+        android:strokeColor="#ECEFF4"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:pathData="M70,90L98,100" />
+</vector>

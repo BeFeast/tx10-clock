@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <title>TX10 Clock visual contract v0.1.0 — 24-hour digital overlay</title>
+  <rect x="650" y="176" width="582" height="368" fill="#000000"/>
+  <g font-family="Arial, Helvetica, sans-serif" text-anchor="middle">
+    <text x="941" y="377" fill="#F5F5F7" font-size="190" font-weight="300" letter-spacing="-7" textLength="535" lengthAdjust="spacingAndGlyphs">22:09</text>
+    <text x="941" y="447" fill="#A1A1A6" font-size="38" font-weight="600" letter-spacing="2" textLength="495" lengthAdjust="spacingAndGlyphs" xml:space="preserve"><tspan>SUN, JUL 12&#160;</tspan><tspan fill="#FF9F0A">42</tspan></text>
+  </g>
+</svg>

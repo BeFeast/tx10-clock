@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "viewport_px": [1280, 720],
+  "safe_inset_px": 48,
+  "composition": {
+    "analog_region_px": [48, 72, 540, 576],
+    "digital_region_px": [650, 176, 582, 368],
+    "gap_px": 62
+  },
+  "analog": {
+    "center_px": [318, 360],
+    "tick_outer_radius_px": 267,
+    "major_tick_inner_radius_px": 243,
+    "minor_tick_inner_radius_px": 253,
+    "numeral_baseline_radius_px": 216,
+    "hour_hand_length_px": 116,
+    "minute_hand_length_px": 180,
+    "second_hand_length_px": 216,
+    "second_hand_tail_px": 30,
+    "hub_outer_radius_px": 11,
+    "hub_inner_radius_px": 4
+  },
+  "digital": {
+    "center_x_px": 941,
+    "main_baseline_y_px": 377,
+    "main_target_width_px": 535,
+    "secondary_baseline_y_px": 447,
+    "secondary_target_width_px": 535
+  },
+  "burn_in": {
+    "cadence_seconds": 60,
+    "translation_bounds_px": {
+      "x": [-8, 8],
+      "y": [-8, 8]
+    },
+    "applies_to": "entire composition excluding pure-black background"
+  }
+}

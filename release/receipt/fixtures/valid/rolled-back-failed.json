@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0.0",
+  "receipt_id": "tx10-clock-rel-0004",
+  "source": {
+    "repository": "BeFeast/tx10-clock",
+    "commit_sha": "00112233445566778899aabbccddeeff00112233",
+    "release_tag": "v0.2.1"
+  },
+  "artifact": {
+    "filename": "tx10-clock-v0.2.1-release.apk",
+    "sha256": "252f10c83610ebca1a059c0bae8255eba2f95be4d1d7bcfa89d7248a82d9f111",
+    "size_bytes": 1053000
+  },
+  "package": {
+    "application_id": "com.befeast.tx10clock",
+    "version_name": "0.2.1",
+    "version_code": 4
+  },
+  "signing": {
+    "certificate_sha256_fingerprint": "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99"
+  },
+  "approval": {
+    "approved_by": "operator.release",
+    "approved_at": "2026-07-04T07:00:00Z"
+  },
+  "delivery": {
+    "state": "rolled_back",
+    "history": [
+      { "state": "built", "at": "2026-07-04T07:10:00Z" },
+      { "state": "published", "at": "2026-07-04T07:20:00Z" },
+      { "state": "delivered", "at": "2026-07-04T07:30:00Z" },
+      { "state": "rolled_back", "at": "2026-07-04T08:00:00Z" }
+    ]
+  },
+  "verification": {
+    "state": "failed",
+    "verified_at": "2026-07-04T07:45:00Z"
+  },
+  "rollback": {
+    "reference": "tx10-clock-rel-0003",
+    "reason": "post-delivery verification failed on the target renderer check"
+  }
+}

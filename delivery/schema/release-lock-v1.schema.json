@@ -1,0 +1,127 @@
+{
+  "$id": "https://github.com/BeFeast/tx10-clock/blob/main/delivery/schema/release-lock-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Exact public release identity accepted by live delivery.",
+  "properties": {
+    "artifact": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}\\.apk$",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "sha256",
+        "size_bytes"
+      ],
+      "type": "object"
+    },
+    "evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "const": "release-evidence.json",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "sha256"
+      ],
+      "type": "object"
+    },
+    "package": {
+      "additionalProperties": false,
+      "properties": {
+        "application_id": {
+          "const": "com.befeast.tx10clock",
+          "type": "string"
+        },
+        "version_code": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "version_name": {
+          "const": "0.1.0",
+          "type": "string"
+        }
+      },
+      "required": [
+        "application_id",
+        "version_name",
+        "version_code"
+      ],
+      "type": "object"
+    },
+    "release": {
+      "additionalProperties": false,
+      "properties": {
+        "source_commit_sha": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "tag": {
+          "const": "v0.1.0",
+          "type": "string"
+        },
+        "tag_ref_sha": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tag",
+        "source_commit_sha",
+        "tag_ref_sha"
+      ],
+      "type": "object"
+    },
+    "repository": {
+      "const": "BeFeast/tx10-clock",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "signing": {
+      "additionalProperties": false,
+      "properties": {
+        "certificate_sha256": {
+          "pattern": "^(?:[0-9A-F]{2}:){31}[0-9A-F]{2}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "certificate_sha256"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "repository",
+    "release",
+    "artifact",
+    "package",
+    "signing",
+    "evidence"
+  ],
+  "title": "tx10-clock-delivery-release-lock",
+  "type": "object"
+}

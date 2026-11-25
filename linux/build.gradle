@@ -1,0 +1,33 @@
+plugins {
+    id 'java'
+}
+
+// Linux kiosk runtime. Compiles the shared JVM core plus ClockRenderer
+// UNMODIFIED: the android.graphics imports resolve to the Java2D-backed
+// shims under src/main/java/android/graphics. The Android-surface classes
+// that the linux runtime replaces are excluded from compilation.
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/main/java', '../app/src/main/java']
+            exclude 'com/befeast/tx10clock/MainActivity.java'
+            exclude 'com/befeast/tx10clock/ClockView.java'
+            exclude 'com/befeast/tx10clock/BootReceiver.java'
+            exclude 'com/befeast/tx10clock/AppState.java'
+            exclude 'com/befeast/tx10clock/ConfigDir.java'
+        }
+    }
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+jar {
+    archiveFileName = 'tx10-clock-linux.jar'
+    manifest {
+        attributes 'Main-Class': 'com.befeast.tx10clock.linux.Main'
+    }
+}

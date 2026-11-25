@@ -1,0 +1,12 @@
+.idea/
+*.iml
+.gradle/
+.maestro/
+build/
+local.properties
+captures/
+*.keystore
+*.jks
+*.apk
+*.aab
+__pycache__/

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TX10 Clock</string>
+
+    <!-- English only on the device for now (Clock #54); calendar event titles and shiftKeywords are user data. -->
+    <string name="sleep_plan_title">Sleep plan</string>
+    <string name="sleep_source_not_connected">Calendar not connected</string>
+    <string name="sleep_source_test">TEST DATA</string>
+    <string name="sleep_panel_source_not_connected">Calendar not connected. The source is the secret iCal address of the chosen Google calendar (setup: docs/calendar.md). To check the screen, turn on the test event.</string>
+    <!-- Release builds have no test-event button. -->
+    <string name="sleep_panel_source_not_connected_release">Calendar not connected. The source is the secret iCal address of the chosen Google calendar (setup: docs/calendar.md).</string>
+    <string name="sleep_panel_source_test">TEST DATA, not your calendar: the calendar is not connected.</string>
+    <string name="sleep_source_broken">Calendar: invalid settings file</string>
+    <string name="sleep_source_config_error">Calendar: invalid settings file (%1$s). See docs/calendar.md.</string>
+    <string name="sleep_source_loading">Loading calendar…</string>
+    <string name="sleep_source_never">Calendar not loaded · %1$s</string>
+    <string name="sleep_source_ok">Calendar updated %1$s</string>
+    <string name="sleep_source_stale">Calendar out of date: updated %1$s · %2$s</string>
+    <string name="sleep_source_old">not updated for a long time</string>
+    <string name="sleep_review_count">" · %1$d to review"</string>
+    <string name="sleep_review_item">Review — %1$s</string>
+    <string name="sleep_shift_rule">Shifts are events with the words from the calendar settings; everything else is a meeting.</string>
+    <string name="sleep_strip_confirmed">Sleep %1$s · confirmed</string>
+    <string name="sleep_strip_suggested">Sleep %1$s · suggested</string>
+    <string name="sleep_strip_open_plan">OK — sleep plan</string>
+    <string name="sleep_no_events">No events</string>
+    <string name="sleep_no_window">Sleep window not calculated</string>
+    <string name="sleep_needs_review">Sleep window: needs review</string>
+    <string name="sleep_state_draft">not confirmed</string>
+    <string name="sleep_state_confirmed">confirmed</string>
+    <string name="sleep_state_review">confirmed · calendar changed</string>
+    <string name="sleep_state_changed">changes not confirmed</string>
+    <string name="sleep_confirm_changes">Confirm the changes first</string>
+    <string name="sleep_take_suggestion">Take suggestion</string>
+    <string name="sleep_new_suggestion">The calendar changed: new suggestion %1$s. The confirmed plan is unchanged.</string>
+    <string name="sleep_edited">Changed — confirm the plan</string>
+    <string name="sleep_start_earlier">Start −15</string>
+    <string name="sleep_start_later">Start +15</string>
+    <string name="sleep_end_earlier">End −15</string>
+    <string name="sleep_end_later">End +15</string>
+    <string name="sleep_confirm">Confirm plan</string>
+    <string name="sleep_music">Music: %1$d min</string>
+    <string name="sleep_start_dremla">Start Dremla</string>
+    <string name="sleep_test_events">Test event</string>
+    <string name="sleep_test_events_on">Test event: on</string>
+    <string name="sleep_test_events_off">Test event: off</string>
+    <string name="sleep_close">Close</string>
+    <string name="sleep_confirm_first">Confirm the plan first</string>
+    <string name="sleep_refused">Dremla did not start: %1$s</string>
+    <string name="sleep_dremla_missing">Dremla is not installed</string>
+    <string name="sleep_session_exists">A sleep session is already running</string>
+    <string name="sleep_wake_prompt">Sleep window until %1$s\nOK — “I’m awake / Show the clock”</string>
+</resources>

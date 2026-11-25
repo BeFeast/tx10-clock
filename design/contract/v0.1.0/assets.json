@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "bundled_assets": [],
+  "bundled_fonts": [],
+  "runtime_font": {
+    "name": "Android system sans-serif",
+    "bundled": false,
+    "reason": "Native to the API 29 target; avoids bundling or redistributing any third-party or vendor-proprietary font."
+  },
+  "provenance": {
+    "composition": "original clean-room design",
+    "excludes": [
+      "calendar grid",
+      "Hebrew date",
+      "third-party or vendor-proprietary fonts or image assets",
+      "reproduction of any third-party product's exact clock geometry"
+    ]
+  }
+}

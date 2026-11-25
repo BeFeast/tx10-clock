@@ -1,0 +1,118 @@
+name: CI
+
+env:
+  ANDROID_PLATFORM: '29'
+  ANDROID_BUILD_TOOLS: '36.0.0'
+  ANDROID_CMDLINE_TOOLS_BUILD: '14742923'
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host-checks:
+    name: Host-only contracts, pins & hygiene (no SDK)
+    # These deterministic checks need only Python 3 + bash — no Android SDK,
+    # network, signing key, or device, giving fast PR coverage.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Release-evidence contract
+        run: bash tools/release-evidence/run-release-evidence-tests.sh
+
+      - name: Release/delivery receipt contract
+        run: bash tools/receipt/run-receipt-tests.sh
+
+      - name: Clock-configuration contract
+        run: bash tools/config-validator/run-config-tests.sh
+
+      - name: ADB delivery preflight contract
+        run: bash delivery/preflight/run-preflight-tests.sh
+
+      - name: Approval-gated delivery contract
+        run: bash delivery/run-delivery-tests.sh
+
+      - name: Pinned release inputs
+        run: bash scripts/check-release-pins.sh
+
+      - name: Config core is renderer-agnostic
+        run: bash scripts/check-config-renderer-agnostic.sh
+
+      - name: Public-path hygiene
+        run: bash scripts/check-public-hygiene.sh
+
+  verify:
+    name: Build, static checks & offscreen golden verifier
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Android SDK
+        # Forgejo resolves bare action names on data.forgejo.org, which has no mirror of this one.
+        uses: https://github.com/android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+        with:
+          # Package installation is explicit below so release inputs stay pinned.
+          packages: ''
+          # Pinned release inputs (release/toolchain.lock.json): compile against
+          # platform 29 with Build Tools 36.0.0 (AGP 9.2.1 requires 36.0.0).
+          cmdline-tools-version: ${{ env.ANDROID_CMDLINE_TOOLS_BUILD }}
+
+      - name: Install pinned SDK packages
+        run: |
+          sdkmanager --install \
+            'platform-tools' \
+            'platforms;android-${{ env.ANDROID_PLATFORM }}' \
+            'build-tools;${{ env.ANDROID_BUILD_TOOLS }}' </dev/null
+
+      # Runs the documented outcome checks: clean build, Android Lint,
+      # unit/static scene/format/config checks, the offscreen golden verifier,
+      # APK manifest/no-native-lib inspection, and the public-path hygiene scan.
+      - name: Run outcome verifier
+        run: bash scripts/verify-outcome.sh
+
+      # Forgejo's artifact service rejects actions/upload-artifact v4 (GHESNotSupportedError);
+      # this is the pin the Forgejo CI of BeFeast/dremla already uses. release.yml runs on GitHub.
+      - name: Upload golden diagnostics (on failure)
+        if: failure()
+        uses: https://code.forgejo.org/forgejo/upload-artifact@16871d9e8cfcf27ff31822cac382bbb5450f1e1e # v4
+        with:
+          name: golden-output
+          path: app/build/golden-output/
+          if-no-files-found: ignore
+
+      - name: Upload unit/lint reports (on failure)
+        if: failure()
+        uses: https://code.forgejo.org/forgejo/upload-artifact@16871d9e8cfcf27ff31822cac382bbb5450f1e1e # v4
+        with:
+          name: reports
+          path: |
+            app/build/reports/
+            app/build/test-results/
+          if-no-files-found: ignore
+
+      - name: Upload unsigned APK for CI inspection only
+        if: success()
+        uses: https://code.forgejo.org/forgejo/upload-artifact@16871d9e8cfcf27ff31822cac382bbb5450f1e1e # v4
+        with:
+          # Signing/release distribution belongs to the release issue. This
+          # artifact is deliberately not installable and must not be published
+          # as a GitHub Release asset.
+          name: tx10-clock-unsigned-ci-verification-apk
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error

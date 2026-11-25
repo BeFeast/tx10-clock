@@ -1,0 +1,79 @@
+{
+  "schema_version": "1.0.0",
+  "evidence_id": "tx10-clock-v0-1-0",
+  "source": {
+    "repository": "BeFeast/tx10-clock",
+    "commit_sha": "0123456789abcdef0123456789abcdef01234567",
+    "release_tag": "v0.1.0"
+  },
+  "toolchain": {
+    "jdk_major": 17,
+    "android_gradle_plugin": "9.2.1",
+    "gradle": "9.4.1",
+    "gradle_distribution_sha256": "2ab2958f2a1e51120c326cad6f385153bb11ee93b3c216c5fccebfdfbb7ec6cb",
+    "android_platform": 29,
+    "build_tools": "36.0.0",
+    "command_line_tools": "14742923",
+    "dependency_verification": true,
+    "dependency_locking": true,
+    "allows_dynamic_versions": false,
+    "allows_snapshot_dependencies": false,
+    "actions_fully_sha_pinned": true
+  },
+  "sdk_packages": [
+    {
+      "path": "platforms;android-29",
+      "revision": "5",
+      "sha256": "9f818a7f5b3a4f4b5c8d1e2f3a4b5c6d7e8f90112233445566778899aabbccdd"
+    },
+    {
+      "path": "build-tools;36.0.0",
+      "revision": "36.0.0",
+      "sha256": "112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00"
+    },
+    {
+      "path": "cmdline-tools;19.0",
+      "revision": "19.0",
+      "sha256": "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899"
+    }
+  ],
+  "artifact": {
+    "filename": "tx10-clock-v0.1.0-release.apk",
+    "sha256": "fcde2b2edba56bf408601fb721fe9b5c338d10ee429ea04fae5511b68fbf8fb9",
+    "size_bytes": 1052672
+  },
+  "package": {
+    "application_id": "com.befeast.tx10clock",
+    "version_name": "0.1.0",
+    "version_code": "1"
+  },
+  "native_libraries": {
+    "present": false,
+    "entries": []
+  },
+  "signing": {
+    "certificate_sha256_fingerprint": "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
+    "key_reference": "infisical://tx10-clock/release/signing-key",
+    "apksigner_verified": true,
+    "apksigner_command": "apksigner verify --print-certs -Werr"
+  },
+  "reproducibility": {
+    "compared": true,
+    "byte_identical": true,
+    "builds": [
+      {
+        "environment": "ci-clean-runner-a",
+        "artifact_sha256": "fcde2b2edba56bf408601fb721fe9b5c338d10ee429ea04fae5511b68fbf8fb9"
+      },
+      {
+        "environment": "ci-clean-runner-b",
+        "artifact_sha256": "fcde2b2edba56bf408601fb721fe9b5c338d10ee429ea04fae5511b68fbf8fb9"
+      }
+    ]
+  },
+  "ci": {
+    "provider": "github-actions",
+    "workflow": "release.yml",
+    "run_url": "https://github.com/BeFeast/tx10-clock/actions/runs/1234567890"
+  }
+}

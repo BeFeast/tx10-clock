@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Normal (non-dangerous) permissions only. RECEIVE_BOOT_COMPLETED restarts
+         the clock after a reboot. INTERNET is used for exactly one thing: the
+         read-only fetch of the calendar feed configured in calendar-source.json
+         (none configured: no network use). No ACCESS_NETWORK_STATE, WAKE_LOCK,
+         or storage permission: the config transport uses app-scoped external
+         files, which need none. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Android TV boxes (like the TX10 Pro) have no touchscreen and use the
+         Leanback launcher. Neither feature is *required* so the same APK can
+         still be side-loaded onto a phone/tablet for development. -->
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="false" />
+    <uses-feature
+        android:name="android.software.leanback"
+        android:required="false" />
+
+    <application
+        android:allowBackup="true"
+        android:banner="@drawable/tv_banner"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Tx10Clock">
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            android:exported="true"
+            android:screenOrientation="landscape">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <!-- LAUNCHER keeps it visible on non-TV devices; LEANBACK_LAUNCHER
+                     makes it a first-class Android TV home-screen app. -->
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Restarts the clock after a reboot. It only auto-starts once the app
+             has been opened at least once and the accepted config keeps
+             bootStart enabled (the default). No root/overlay/kiosk. -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>

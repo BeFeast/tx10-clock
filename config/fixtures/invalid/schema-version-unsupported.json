@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "9.9.9",
+  "clock": {
+    "hourCycle": "h24",
+    "showSeconds": true,
+    "showDate": true,
+    "analogSweep": "smooth"
+  },
+  "locale": {
+    "policy": "device",
+    "tag": null
+  },
+  "timeZone": {
+    "policy": "device",
+    "id": null
+  },
+  "burnIn": {
+    "shiftEnabled": false,
+    "shiftRadiusPx": 0,
+    "shiftIntervalSeconds": 60
+  },
+  "runtime": {
+    "bootStart": true,
+    "keepScreenOn": true,
+    "safeRefresh": true
+  }
+}
